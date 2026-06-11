@@ -1,7 +1,82 @@
 ﻿@page "/"
+@using HumanFlow.Web.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
 
-<PageTitle>Home</PageTitle>
+<PageTitle>HumanFlow</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="mb-4">
+    <h1>HumanFlow</h1>
+    <p class="lead">MVP fundacional para administrar tenants, seguridad, legajos, contactos y datos maestros de RRHH.</p>
+</div>
 
-Welcome to your new app.
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-muted small">Tenants</div>
+                <div class="display-6">@_tenantCount</div>
+                <a href="admin/tenants">Administrar tenants</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-muted small">Legajos</div>
+                <div class="display-6">@_employeeCount</div>
+                <a href="employees">Ver empleados</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-muted small">Contactos</div>
+                <div class="display-6">@_contactCount</div>
+                <a href="contacts">Ver contactos</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-muted small">Roles</div>
+                <div class="display-6">@_roleCount</div>
+                <a href="admin/roles">Ver roles</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="mb-4">
+    <h2 class="h4">Alcance visible del MVP</h2>
+    <ul>
+        <li>Modelo multi-tenant hibrido con tenants compartidos y dedicados.</li>
+        <li>Legajo fundacional de empleados con estado laboral y datos principales.</li>
+        <li>Contactos internos y externos reutilizables.</li>
+        <li>Roles base, permisos granulares y usuario administrador demo.</li>
+        <li>Datos maestros iniciales de areas y puestos.</li>
+    </ul>
+</section>
+
+<section>
+    <h2 class="h4">Acceso demo</h2>
+    <p><strong>Usuario:</strong> admin@humanflow.local</p>
+    <p><strong>Password:</strong> HumanFlow123!</p>
+</section>
+
+@code {
+    private int _tenantCount;
+    private int _employeeCount;
+    private int _contactCount;
+    private int _roleCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _tenantCount = await DbContext.Tenants.CountAsync();
+        _employeeCount = await DbContext.Employees.CountAsync();
+        _contactCount = await DbContext.Contacts.CountAsync();
+        _roleCount = await DbContext.HumanFlowRoles.CountAsync();
+    }
+}

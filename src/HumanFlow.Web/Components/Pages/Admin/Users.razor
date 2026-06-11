@@ -1,0 +1,47 @@
+@page "/admin/users"
+@using HumanFlow.Web.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+
+<PageTitle>Usuarios</PageTitle>
+
+<h1>Usuarios</h1>
+<p class="text-muted">Usuarios locales iniciales, preparados para convivir luego con SSO por tenant.</p>
+
+@if (_users is null)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Nombre</th>
+                <th>Email confirmado</th>
+                <th>Rol plataforma</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in _users)
+            {
+                <tr>
+                    <td>@user.Email</td>
+                    <td>@user.DisplayName</td>
+                    <td>@(user.EmailConfirmed ? "Si" : "No")</td>
+                    <td>@user.PlatformRole</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<ApplicationUser>? _users;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _users = await DbContext.Users.OrderBy(x => x.Email).ToListAsync();
+    }
+}

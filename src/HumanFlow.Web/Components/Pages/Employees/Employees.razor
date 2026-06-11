@@ -1,0 +1,69 @@
+@page "/employees"
+@using HumanFlow.Domain.Employees
+@using HumanFlow.Web.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+
+<PageTitle>Legajos</PageTitle>
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h1>Legajos</h1>
+        <p class="text-muted mb-0">Ficha fundacional del empleado, preparada para carrera, documentos y salida.</p>
+    </div>
+    <span class="badge text-bg-primary">@(_employees?.Count ?? 0) empleados</span>
+</div>
+
+@if (_employees is null)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Legajo</th>
+                <th>Nombre</th>
+                <th>Email</th>
+                <th>Telefono</th>
+                <th>Ingreso</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var employee in _employees)
+            {
+                <tr>
+                    <td>@employee.EmployeeNumber</td>
+                    <td>@employee.FullName</td>
+                    <td>@employee.Email</td>
+                    <td>@employee.Phone</td>
+                    <td>@employee.HireDate?.ToString("yyyy-MM-dd")</td>
+                    <td><span class="@StatusClass(employee.Status)">@employee.Status</span></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Employee>? _employees;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _employees = await DbContext.Employees
+            .OrderBy(x => x.LastName)
+            .ThenBy(x => x.FirstName)
+            .ToListAsync();
+    }
+
+    private static string StatusClass(EmployeeStatus status) =>
+        status switch
+        {
+            EmployeeStatus.Active => "badge text-bg-success",
+            EmployeeStatus.OnLeave => "badge text-bg-warning",
+            EmployeeStatus.Terminated => "badge text-bg-secondary",
+            _ => "badge text-bg-light"
+        };
+}

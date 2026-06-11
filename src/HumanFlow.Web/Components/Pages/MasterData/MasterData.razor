@@ -1,0 +1,64 @@
+@page "/master-data"
+@using HumanFlow.Domain.Organization
+@using HumanFlow.Web.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+
+<PageTitle>Datos maestros</PageTitle>
+
+<h1>Datos maestros</h1>
+<p class="text-muted">Areas, puestos y catalogos base para operar el legajo.</p>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">Unidades organizativas</div>
+            <div class="card-body">
+                @if (_organizationUnits is null)
+                {
+                    <p>Cargando...</p>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var unit in _organizationUnits)
+                        {
+                            <li class="list-group-item">@unit.Code - @unit.Name</li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">Puestos</div>
+            <div class="card-body">
+                @if (_jobPositions is null)
+                {
+                    <p>Cargando...</p>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var position in _jobPositions)
+                        {
+                            <li class="list-group-item">@position.Code - @position.Title</li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<OrganizationUnit>? _organizationUnits;
+    private List<JobPosition>? _jobPositions;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _organizationUnits = await DbContext.OrganizationUnits.OrderBy(x => x.Name).ToListAsync();
+        _jobPositions = await DbContext.JobPositions.OrderBy(x => x.Title).ToListAsync();
+    }
+}

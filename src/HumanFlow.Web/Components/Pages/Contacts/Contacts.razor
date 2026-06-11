@@ -1,0 +1,60 @@
+@page "/contacts"
+@using HumanFlow.Domain.Contacts
+@using HumanFlow.Web.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+
+<PageTitle>Contactos</PageTitle>
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h1>Contactos</h1>
+        <p class="text-muted mb-0">Contactos internos y externos reutilizables por RRHH.</p>
+    </div>
+    <span class="badge text-bg-primary">@(_contacts?.Count ?? 0) contactos</span>
+</div>
+
+@if (_contacts is null)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Clase</th>
+                <th>Tipo</th>
+                <th>Organizacion</th>
+                <th>Email</th>
+                <th>Telefono</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var contact in _contacts)
+            {
+                <tr>
+                    <td>@contact.DisplayName</td>
+                    <td>@contact.Kind</td>
+                    <td>@contact.Type</td>
+                    <td>@contact.OrganizationName</td>
+                    <td>@contact.Email</td>
+                    <td>@contact.Phone</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Contact>? _contacts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _contacts = await DbContext.Contacts
+            .OrderBy(x => x.Kind)
+            .ThenBy(x => x.DisplayName)
+            .ToListAsync();
+    }
+}

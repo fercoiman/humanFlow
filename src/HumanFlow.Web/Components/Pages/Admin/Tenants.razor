@@ -1,0 +1,59 @@
+@page "/admin/tenants"
+@using HumanFlow.Domain.Tenancy
+@using HumanFlow.Web.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+
+<PageTitle>Tenants</PageTitle>
+
+<h1>Tenants</h1>
+<p class="text-muted">Catalogo central de clientes y estrategia de almacenamiento para el modelo multi-tenant hibrido.</p>
+
+@if (_tenants is null)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Slug</th>
+                <th>Dominio</th>
+                <th>Estado</th>
+                <th>Almacenamiento</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var tenant in _tenants)
+            {
+                <tr>
+                    <td>@tenant.Name</td>
+                    <td><code>@tenant.Slug</code></td>
+                    <td>@tenant.PrimaryDomain</td>
+                    <td>@tenant.Status</td>
+                    <td>
+                        <span class="@StorageClass(tenant.StorageMode)">
+                            @tenant.StorageMode
+                        </span>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Tenant>? _tenants;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _tenants = await DbContext.Tenants.OrderBy(x => x.Name).ToListAsync();
+    }
+
+    private static string StorageClass(TenantStorageMode storageMode) =>
+        storageMode == TenantStorageMode.DedicatedDatabase
+            ? "badge text-bg-warning"
+            : "badge text-bg-info";
+}

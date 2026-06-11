@@ -1,0 +1,67 @@
+@page "/admin/roles"
+@using HumanFlow.Domain.Security
+@using HumanFlow.Web.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+
+<PageTitle>Roles y permisos</PageTitle>
+
+<h1>Roles y permisos</h1>
+<p class="text-muted">Roles base por tenant y catalogo de permisos granulares preparados para crecer.</p>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">Roles del tenant demo</div>
+            <div class="card-body">
+                @if (_roles is null)
+                {
+                    <p>Cargando...</p>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var role in _roles)
+                        {
+                            <li class="list-group-item">
+                                <strong>@role.Name</strong>
+                                <div class="text-muted">@role.Description</div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">Permisos disponibles</div>
+            <div class="card-body">
+                @if (_permissions is null)
+                {
+                    <p>Cargando...</p>
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var permission in _permissions)
+                        {
+                            <span class="badge text-bg-light border">@permission.Key</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Role>? _roles;
+    private List<PermissionDefinition>? _permissions;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _roles = await DbContext.HumanFlowRoles.OrderBy(x => x.Name).ToListAsync();
+        _permissions = await DbContext.PermissionDefinitions.OrderBy(x => x.Module).ThenBy(x => x.Key).ToListAsync();
+    }
+}
