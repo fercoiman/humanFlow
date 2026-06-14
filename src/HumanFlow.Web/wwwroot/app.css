@@ -698,6 +698,19 @@ a, .btn-link {
   background-size: 1.5rem;
 }
 
+/* ─── Phase B: Performance Reviews ──────────────────── */
+.hf-badge-purple {
+  background: #F5F3FF;
+  color: #7C3AED;
+  border-color: #DDD6FE;
+}
+
+.hf-review-detail {
+  padding: 1rem 1.25rem;
+  background: var(--color-muted);
+  border-top: 1px solid var(--color-border);
+}
+
 .blazor-error-boundary::after { content: "Ha ocurrido un error inesperado."; }
 
 /* ─── Tabs ───────────────────────────────────────────── */

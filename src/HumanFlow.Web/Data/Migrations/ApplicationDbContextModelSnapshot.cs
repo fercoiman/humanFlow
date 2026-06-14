@@ -351,6 +351,83 @@ namespace HumanFlow.Web.Data.Migrations
                     b.ToTable("EmployeeEvents");
                 });
 
+            modelBuilder.Entity("HumanFlow.Domain.Employees.PerformanceReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("AcknowledgedDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("AcknowledgementNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("GoalsNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("ImprovementNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("OverallRating")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PeriodNumber")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PeriodType")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PeriodYear")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("ReviewDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("ReviewerEmployeeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StrengthsNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "EmployeeId");
+
+                    b.HasIndex("EmployeeId", "PeriodYear", "PeriodType", "PeriodNumber")
+                        .IsUnique();
+
+                    b.ToTable("PerformanceReviews");
+                });
+
             modelBuilder.Entity("HumanFlow.Domain.Employees.PositionHistory", b =>
                 {
                     b.Property<Guid>("Id")

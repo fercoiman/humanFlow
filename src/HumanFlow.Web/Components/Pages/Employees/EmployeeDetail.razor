@@ -63,6 +63,10 @@ else
             Contactos
             @if (_contacts.Count > 0) { <span>&nbsp;(@_contacts.Count)</span> }
         </button>
+        <button class="hf-tab @(Tab == "desempeno" ? "active" : "")" @onclick='() => SetTab("desempeno")'>
+            Desempeño
+            @if (_reviews.Count > 0) { <span>&nbsp;(@_reviews.Count)</span> }
+        </button>
         <button class="hf-tab @(Tab == "salida" ? "active" : "")" @onclick='() => SetTab("salida")'>Desvinculación</button>
     </div>
 
@@ -404,6 +408,207 @@ else
         </div>
     }
 
+    <!-- ══ TAB: DESEMPEÑO ════════════════════════════════════ -->
+    @if (Tab == "desempeno")
+    {
+        <div class="hf-section">
+            <div class="hf-section-header">
+                <h2 class="hf-section-title">Evaluaciones de desempeño</h2>
+                @if (!_showReviewForm)
+                {
+                    <button class="btn btn-primary btn-sm" @onclick="() => _showReviewForm = true">+ Registrar evaluación</button>
+                }
+            </div>
+
+            @if (_reviews.Count == 0 && !_showReviewForm)
+            {
+                <div class="hf-section-body" style="color:var(--color-foreground-muted);font-size:.875rem">
+                    Sin evaluaciones de desempeño registradas.
+                </div>
+            }
+            else
+            {
+                <div class="hf-table-wrapper">
+                    <table class="hf-table">
+                        <thead>
+                            <tr>
+                                <th>Período</th>
+                                <th>Fecha</th>
+                                <th>Evaluador</th>
+                                <th>Calificación</th>
+                                <th>Estado</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var rev in _reviews.OrderByDescending(r => r.PeriodYear).ThenByDescending(r => r.PeriodNumber))
+                            {
+                                var isExpanded = _expandedReviewId == rev.Id;
+                                <tr>
+                                    <td style="font-weight:600">@rev.PeriodLabel</td>
+                                    <td style="color:var(--color-foreground-muted)">@rev.ReviewDate.ToString("dd/MM/yyyy")</td>
+                                    <td style="color:var(--color-foreground-muted)">@GetEmployeeName(rev.ReviewerEmployeeId)</td>
+                                    <td><span class="@RatingClass(rev.OverallRating)">@RatingLabel(rev.OverallRating)</span></td>
+                                    <td><span class="@ReviewStatusClass(rev.Status)">@ReviewStatusLabel(rev.Status)</span></td>
+                                    <td style="text-align:right">
+                                        <button class="btn-hf-secondary" style="padding:.25rem .75rem;font-size:.75rem"
+                                                @onclick="() => ToggleReview(rev.Id)">
+                                            @(isExpanded ? "Cerrar" : "Ver detalles")
+                                        </button>
+                                    </td>
+                                </tr>
+                                @if (isExpanded)
+                                {
+                                    <tr>
+                                        <td colspan="6" style="padding:0">
+                                            <div class="hf-review-detail">
+                                                <div class="hf-field-grid" style="padding:0">
+                                                    @if (!string.IsNullOrEmpty(rev.StrengthsNotes))
+                                                    {
+                                                        <div class="hf-field hf-form-grid-full">
+                                                            <span class="hf-field-label">Fortalezas</span>
+                                                            <span class="hf-field-value">@rev.StrengthsNotes</span>
+                                                        </div>
+                                                    }
+                                                    @if (!string.IsNullOrEmpty(rev.ImprovementNotes))
+                                                    {
+                                                        <div class="hf-field hf-form-grid-full">
+                                                            <span class="hf-field-label">Áreas de mejora</span>
+                                                            <span class="hf-field-value">@rev.ImprovementNotes</span>
+                                                        </div>
+                                                    }
+                                                    @if (!string.IsNullOrEmpty(rev.GoalsNotes))
+                                                    {
+                                                        <div class="hf-field hf-form-grid-full">
+                                                            <span class="hf-field-label">Objetivos próximo período</span>
+                                                            <span class="hf-field-value">@rev.GoalsNotes</span>
+                                                        </div>
+                                                    }
+                                                    @if (rev.AcknowledgedDate.HasValue)
+                                                    {
+                                                        <FieldView Label="Reconocida el" Value="@rev.AcknowledgedDate.Value.ToString("dd/MM/yyyy")" />
+                                                        @if (!string.IsNullOrEmpty(rev.AcknowledgementNotes))
+                                                        {
+                                                            <div class="hf-field hf-form-grid-full">
+                                                                <span class="hf-field-label">Nota de reconocimiento</span>
+                                                                <span class="hf-field-value">@rev.AcknowledgementNotes</span>
+                                                            </div>
+                                                        }
+                                                    }
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            @if (_showReviewForm)
+            {
+                <div class="hf-add-form">
+                    <p class="hf-add-form-title">Registrar evaluación de desempeño</p>
+                    <div class="hf-form-grid">
+                        <div>
+                            <label class="hf-field-label form-label">Tipo de período</label>
+                            <InputSelect TValue="ReviewPeriodType" @bind-Value="_rf.PeriodType" class="form-select form-select-sm">
+                                <option value="@ReviewPeriodType.Annual">Anual</option>
+                                <option value="@ReviewPeriodType.SemiAnnual">Semestral</option>
+                                <option value="@ReviewPeriodType.Quarterly">Trimestral</option>
+                            </InputSelect>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Año</label>
+                            <input class="form-control form-control-sm" type="number" min="2000" max="2100" @bind="_rf.PeriodYear" />
+                        </div>
+                        @if (_rf.PeriodType == ReviewPeriodType.SemiAnnual)
+                        {
+                            <div>
+                                <label class="hf-field-label form-label">Semestre</label>
+                                <select class="form-select form-select-sm" @bind="_rf.PeriodNumber">
+                                    <option value="1">1er Semestre</option>
+                                    <option value="2">2do Semestre</option>
+                                </select>
+                            </div>
+                        }
+                        else if (_rf.PeriodType == ReviewPeriodType.Quarterly)
+                        {
+                            <div>
+                                <label class="hf-field-label form-label">Trimestre</label>
+                                <select class="form-select form-select-sm" @bind="_rf.PeriodNumber">
+                                    <option value="1">1er Trimestre</option>
+                                    <option value="2">2do Trimestre</option>
+                                    <option value="3">3er Trimestre</option>
+                                    <option value="4">4to Trimestre</option>
+                                </select>
+                            </div>
+                        }
+                        <div>
+                            <label class="hf-field-label form-label">Fecha de evaluación <span style="color:var(--color-destructive)">*</span></label>
+                            <InputDate TValue="DateOnly" @bind-Value="_rf.ReviewDate" class="form-control form-control-sm" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Evaluador</label>
+                            <select class="form-select form-select-sm" @bind="_rf.ReviewerEmployeeId">
+                                <option value="">— Sin asignar —</option>
+                                @foreach (var emp in _allEmployees)
+                                {
+                                    <option value="@emp.Id">@emp.FullName</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Calificación global <span style="color:var(--color-destructive)">*</span></label>
+                            <InputSelect TValue="ReviewRating" @bind-Value="_rf.OverallRating" class="form-select form-select-sm">
+                                @foreach (var r in Enum.GetValues<ReviewRating>())
+                                {
+                                    <option value="@r">@RatingLabel(r)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Estado</label>
+                            <InputSelect TValue="ReviewStatus" @bind-Value="_rf.Status" class="form-select form-select-sm">
+                                <option value="@ReviewStatus.Draft">Borrador</option>
+                                <option value="@ReviewStatus.Completed">Completada</option>
+                                <option value="@ReviewStatus.Acknowledged">Reconocida</option>
+                            </InputSelect>
+                        </div>
+                        @if (_rf.Status == ReviewStatus.Acknowledged)
+                        {
+                            <div>
+                                <label class="hf-field-label form-label">Fecha de reconocimiento</label>
+                                <InputDate TValue="DateOnly?" @bind-Value="_rf.AcknowledgedDate" class="form-control form-control-sm" />
+                            </div>
+                        }
+                        <div class="hf-form-grid-full">
+                            <label class="hf-field-label form-label">Fortalezas</label>
+                            <textarea class="form-control form-control-sm" rows="2" @bind="_rf.StrengthsNotes"></textarea>
+                        </div>
+                        <div class="hf-form-grid-full">
+                            <label class="hf-field-label form-label">Áreas de mejora</label>
+                            <textarea class="form-control form-control-sm" rows="2" @bind="_rf.ImprovementNotes"></textarea>
+                        </div>
+                        <div class="hf-form-grid-full">
+                            <label class="hf-field-label form-label">Objetivos próximo período</label>
+                            <textarea class="form-control form-control-sm" rows="2" @bind="_rf.GoalsNotes"></textarea>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_reviewError))
+                        {
+                            <div class="hf-alert-error">@_reviewError</div>
+                        }
+                    </div>
+                    <div class="hf-form-actions">
+                        <button class="btn btn-primary btn-sm" @onclick="SaveReview">Guardar evaluación</button>
+                        <button class="btn-hf-secondary" @onclick="() => { _showReviewForm = false; _reviewError = null; }">Cancelar</button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
     <!-- ══ TAB: DESVINCULACIÓN ══════════════════════════════ -->
     @if (Tab == "salida")
     {
@@ -540,6 +745,13 @@ else
     private string? _contactError;
     private ContactForm _cf = new();
 
+    // ── Form: performance review ─────────────────────────
+    private List<PerformanceReview> _reviews = [];
+    private bool _showReviewForm;
+    private string? _reviewError;
+    private ReviewForm _rf = new();
+    private Guid? _expandedReviewId;
+
     // ── Form: termination ────────────────────────────────
     private string? _terminationError;
     private TerminationForm _tf = new();
@@ -568,6 +780,12 @@ else
 
             _termination = await DbContext.TerminationRecords
                 .FirstOrDefaultAsync(t => t.EmployeeId == Id && !t.IsDeleted);
+
+            _reviews = await DbContext.PerformanceReviews
+                .Where(r => r.EmployeeId == Id && !r.IsDeleted)
+                .OrderByDescending(r => r.PeriodYear)
+                .ThenByDescending(r => r.PeriodNumber)
+                .ToListAsync();
 
             _jobPositions = await DbContext.JobPositions
                 .Where(j => j.TenantId == tid && j.IsActive)
@@ -601,8 +819,10 @@ else
         Tab = tab;
         _showPosForm = false;
         _showContactForm = false;
+        _showReviewForm = false;
         _editingPersonal = false;
-        _personalError = _posError = _contactError = _terminationError = null;
+        _expandedReviewId = null;
+        _personalError = _posError = _contactError = _reviewError = _terminationError = null;
     }
 
     // ── Personal data edit ────────────────────────────────
@@ -778,6 +998,53 @@ else
         await LoadAll();
     }
 
+    // ── Performance review ────────────────────────────────
+    private void ToggleReview(Guid id) =>
+        _expandedReviewId = _expandedReviewId == id ? (Guid?)null : id;
+
+    private async Task SaveReview()
+    {
+        _reviewError = null;
+        if (_rf.ReviewDate == default)
+        {
+            _reviewError = "La fecha de evaluación es obligatoria.";
+            return;
+        }
+
+        var periodNum = _rf.PeriodType == ReviewPeriodType.Annual ? 1 : _rf.PeriodNumber;
+        var duplicate = _reviews.Any(r =>
+            r.PeriodType == _rf.PeriodType &&
+            r.PeriodYear == _rf.PeriodYear &&
+            r.PeriodNumber == periodNum);
+        if (duplicate)
+        {
+            _reviewError = "Ya existe una evaluación registrada para ese período.";
+            return;
+        }
+
+        DbContext.PerformanceReviews.Add(new PerformanceReview
+        {
+            TenantId = _employee!.TenantId,
+            EmployeeId = _employee.Id,
+            PeriodType = _rf.PeriodType,
+            PeriodYear = _rf.PeriodYear,
+            PeriodNumber = periodNum,
+            ReviewDate = _rf.ReviewDate,
+            ReviewerEmployeeId = ToGuid(_rf.ReviewerEmployeeId),
+            OverallRating = _rf.OverallRating,
+            StrengthsNotes = _rf.StrengthsNotes,
+            ImprovementNotes = _rf.ImprovementNotes,
+            GoalsNotes = _rf.GoalsNotes,
+            Status = _rf.Status,
+            AcknowledgedDate = _rf.Status == ReviewStatus.Acknowledged ? _rf.AcknowledgedDate : null
+        });
+
+        await DbContext.SaveChangesAsync();
+        _showReviewForm = false;
+        _rf = new ReviewForm();
+        await LoadAll();
+    }
+
     // ── Lookup helpers ────────────────────────────────────
     private string GetPositionTitle(Guid? id) =>
         id.HasValue ? _jobPositions.FirstOrDefault(j => j.Id == id)?.Title ?? "—" : "—";
@@ -898,5 +1165,56 @@ else
         public string? Reason { get; set; }
         public string? ExitInterviewNotes { get; set; }
         public bool IsEligibleForRehire { get; set; } = true;
+    }
+
+    private static string RatingClass(ReviewRating r) => r switch
+    {
+        ReviewRating.BelowExpectations   => "hf-badge hf-badge-danger",
+        ReviewRating.NeedsImprovement    => "hf-badge hf-badge-warning",
+        ReviewRating.MeetsExpectations   => "hf-badge hf-badge-primary",
+        ReviewRating.ExceedsExpectations => "hf-badge hf-badge-success",
+        ReviewRating.Outstanding         => "hf-badge hf-badge-purple",
+        _                                => "hf-badge hf-badge-neutral"
+    };
+
+    private static string RatingLabel(ReviewRating r) => r switch
+    {
+        ReviewRating.BelowExpectations   => "Muy por debajo",
+        ReviewRating.NeedsImprovement    => "Por debajo",
+        ReviewRating.MeetsExpectations   => "Cumple",
+        ReviewRating.ExceedsExpectations => "Supera",
+        ReviewRating.Outstanding         => "Sobresaliente",
+        _                                => r.ToString()
+    };
+
+    private static string ReviewStatusClass(ReviewStatus s) => s switch
+    {
+        ReviewStatus.Draft        => "hf-badge hf-badge-neutral",
+        ReviewStatus.Completed    => "hf-badge hf-badge-primary",
+        ReviewStatus.Acknowledged => "hf-badge hf-badge-success",
+        _                         => "hf-badge hf-badge-neutral"
+    };
+
+    private static string ReviewStatusLabel(ReviewStatus s) => s switch
+    {
+        ReviewStatus.Draft        => "Borrador",
+        ReviewStatus.Completed    => "Completada",
+        ReviewStatus.Acknowledged => "Reconocida",
+        _                         => s.ToString()
+    };
+
+    private sealed class ReviewForm
+    {
+        public ReviewPeriodType PeriodType { get; set; } = ReviewPeriodType.Annual;
+        public int PeriodYear { get; set; } = DateTime.Today.Year;
+        public int PeriodNumber { get; set; } = 1;
+        public DateOnly ReviewDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+        public string ReviewerEmployeeId { get; set; } = "";
+        public ReviewRating OverallRating { get; set; } = ReviewRating.MeetsExpectations;
+        public string? StrengthsNotes { get; set; }
+        public string? ImprovementNotes { get; set; }
+        public string? GoalsNotes { get; set; }
+        public ReviewStatus Status { get; set; } = ReviewStatus.Draft;
+        public DateOnly? AcknowledgedDate { get; set; }
     }
 }

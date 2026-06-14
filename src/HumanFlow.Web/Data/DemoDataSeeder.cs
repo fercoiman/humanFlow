@@ -348,6 +348,106 @@ public static class DemoDataSeeder
             });
         }
 
+        // ── Evaluaciones de desempeño ─────────────────────────────
+        if (emp1 is not null && !await db.PerformanceReviews.AnyAsync(r => r.EmployeeId == emp1.Id))
+        {
+            db.PerformanceReviews.AddRange(
+                new PerformanceReview
+                {
+                    TenantId = demoTenant.Id,
+                    EmployeeId = emp1.Id,
+                    PeriodType = ReviewPeriodType.Annual,
+                    PeriodYear = 2022,
+                    PeriodNumber = 1,
+                    ReviewDate = new DateOnly(2022, 12, 15),
+                    OverallRating = ReviewRating.ExceedsExpectations,
+                    StrengthsNotes = "Excelente capacidad de resolución de conflictos y liderazgo informal. Muy buen manejo de las herramientas del sector.",
+                    ImprovementNotes = "Mejorar la documentación de procesos internos.",
+                    GoalsNotes = "Certificación en HRIS durante el 1er semestre de 2023. Tomar curso de liderazgo.",
+                    Status = ReviewStatus.Acknowledged,
+                    AcknowledgedDate = new DateOnly(2022, 12, 20)
+                },
+                new PerformanceReview
+                {
+                    TenantId = demoTenant.Id,
+                    EmployeeId = emp1.Id,
+                    PeriodType = ReviewPeriodType.Annual,
+                    PeriodYear = 2023,
+                    PeriodNumber = 1,
+                    ReviewDate = new DateOnly(2024, 1, 10),
+                    OverallRating = ReviewRating.Outstanding,
+                    StrengthsNotes = "Liderazgo técnico sobresaliente. Mentorea efectivamente al equipo junior. Resolvió el proyecto de migración HRIS en tiempo y forma.",
+                    ImprovementNotes = "Desarrollar habilidades de presentación ejecutiva.",
+                    GoalsNotes = "Liderar la implementación de la Fase B del HRIS. Presentar roadmap al Directorio en Q2 2024.",
+                    Status = ReviewStatus.Acknowledged,
+                    AcknowledgedDate = new DateOnly(2024, 1, 18)
+                },
+                new PerformanceReview
+                {
+                    TenantId = demoTenant.Id,
+                    EmployeeId = emp1.Id,
+                    PeriodType = ReviewPeriodType.SemiAnnual,
+                    PeriodYear = 2024,
+                    PeriodNumber = 1,
+                    ReviewDate = new DateOnly(2024, 7, 15),
+                    OverallRating = ReviewRating.Outstanding,
+                    StrengthsNotes = "Implementación impecable del módulo de legajos. Alta proactividad y visión de producto.",
+                    Status = ReviewStatus.Completed
+                });
+        }
+
+        if (emp2 is not null && !await db.PerformanceReviews.AnyAsync(r => r.EmployeeId == emp2.Id))
+        {
+            db.PerformanceReviews.AddRange(
+                new PerformanceReview
+                {
+                    TenantId = demoTenant.Id,
+                    EmployeeId = emp2.Id,
+                    PeriodType = ReviewPeriodType.Annual,
+                    PeriodYear = 2022,
+                    PeriodNumber = 1,
+                    ReviewDate = new DateOnly(2023, 1, 5),
+                    OverallRating = ReviewRating.MeetsExpectations,
+                    StrengthsNotes = "Coordinación operativa sólida. Cumple objetivos dentro de los plazos establecidos.",
+                    ImprovementNotes = "Fortalecer la comunicación interdepartamental.",
+                    GoalsNotes = "Revisar y estandarizar los procedimientos de onboarding en Q1 2023.",
+                    Status = ReviewStatus.Acknowledged,
+                    AcknowledgedDate = new DateOnly(2023, 1, 12)
+                },
+                new PerformanceReview
+                {
+                    TenantId = demoTenant.Id,
+                    EmployeeId = emp2.Id,
+                    PeriodType = ReviewPeriodType.Annual,
+                    PeriodYear = 2023,
+                    PeriodNumber = 1,
+                    ReviewDate = new DateOnly(2024, 1, 25),
+                    OverallRating = ReviewRating.ExceedsExpectations,
+                    StrengthsNotes = "Superó los objetivos de reducción de tiempos operativos en un 20%. Lideró la transición del equipo durante la licencia de la gerente.",
+                    Status = ReviewStatus.Completed
+                });
+        }
+
+        if (emp3 is not null && emp1 is not null && !await db.PerformanceReviews.AnyAsync(r => r.EmployeeId == emp3.Id))
+        {
+            db.PerformanceReviews.Add(new PerformanceReview
+            {
+                TenantId = demoTenant.Id,
+                EmployeeId = emp3.Id,
+                PeriodType = ReviewPeriodType.Annual,
+                PeriodYear = 2023,
+                PeriodNumber = 1,
+                ReviewDate = new DateOnly(2024, 1, 20),
+                ReviewerEmployeeId = emp1.Id,
+                OverallRating = ReviewRating.MeetsExpectations,
+                StrengthsNotes = "Primera evaluación anual. Muy buen proceso de adaptación. Asimila rápidamente los procedimientos.",
+                ImprovementNotes = "Necesita mayor autonomía en la toma de decisiones. Continuar desarrollando habilidades de análisis.",
+                GoalsNotes = "Completar la certificación interna de procesos RRHH en H1 2024.",
+                Status = ReviewStatus.Acknowledged,
+                AcknowledgedDate = new DateOnly(2024, 1, 26)
+            });
+        }
+
         // ── Usuario admin ─────────────────────────────────────────
         var admin = await userManager.FindByEmailAsync("admin@humanflow.local");
         if (admin is null)

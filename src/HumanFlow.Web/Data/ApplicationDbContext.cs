@@ -21,6 +21,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<PositionHistory> PositionHistories => Set<PositionHistory>();
     public DbSet<EmployeeContact> EmployeeContacts => Set<EmployeeContact>();
     public DbSet<TerminationRecord> TerminationRecords => Set<TerminationRecord>();
+    public DbSet<PerformanceReview> PerformanceReviews => Set<PerformanceReview>();
     public DbSet<Contact> Contacts => Set<Contact>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -99,6 +100,17 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.Property(x => x.OrganizationName).HasMaxLength(200);
             entity.Property(x => x.Email).HasMaxLength(255);
             entity.Property(x => x.Phone).HasMaxLength(80);
+        });
+
+        builder.Entity<PerformanceReview>(entity =>
+        {
+            entity.HasIndex(x => new { x.TenantId, x.EmployeeId });
+            entity.HasIndex(x => new { x.EmployeeId, x.PeriodYear, x.PeriodType, x.PeriodNumber }).IsUnique();
+            entity.Property(x => x.StrengthsNotes).HasMaxLength(2000);
+            entity.Property(x => x.ImprovementNotes).HasMaxLength(2000);
+            entity.Property(x => x.GoalsNotes).HasMaxLength(2000);
+            entity.Property(x => x.AcknowledgementNotes).HasMaxLength(1000);
+            entity.Ignore(x => x.PeriodLabel);
         });
     }
 }
