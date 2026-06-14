@@ -63,7 +63,11 @@ builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSe
 
 var app = builder.Build();
 
-await DemoDataSeeder.SeedAsync(app.Services);
+await StartupInitializer.InitializeAsync(app.Services);
+
+// Imprimir banner de diagnóstico cuando Kestrel ya esté escuchando
+app.Lifetime.ApplicationStarted.Register(
+    () => _ = StartupInitializer.PrintBannerAsync(app.Services));
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

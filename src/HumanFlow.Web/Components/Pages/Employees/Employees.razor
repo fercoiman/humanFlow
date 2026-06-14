@@ -1,100 +1,359 @@
 @page "/employees"
+@rendermode InteractiveServer
 @using HumanFlow.Domain.Employees
+@using HumanFlow.Domain.Organization
 @using HumanFlow.Web.Data
 @using Microsoft.EntityFrameworkCore
+@using System.Text.RegularExpressions
 @inject ApplicationDbContext DbContext
+@inject NavigationManager Nav
 
 <PageTitle>Legajos — HumanFlow</PageTitle>
 
-<div class="hf-page-header">
-    <div>
-        <h1>Legajos</h1>
-        <p class="hf-page-subtitle">Ficha fundacional del empleado, preparada para carrera, documentos y salida.</p>
-    </div>
-    <span class="hf-badge hf-badge-primary">@(_employees?.Count ?? 0) empleados</span>
-</div>
-
-@if (_employees is null)
+@if (_loading)
 {
-    <div class="hf-loading">
-        <div class="hf-loading-spinner"></div>
-        Cargando legajos&hellip;
+    <div class="hf-loading-state">
+        <div class="hf-spinner"></div>
+        <span>Cargando legajos...</span>
     </div>
 }
 else
 {
-    <div class="hf-table-wrapper">
-        <table class="hf-table">
-            <thead>
-                <tr>
-                    <th>Legajo</th>
-                    <th>Nombre</th>
-                    <th>Email</th>
-                    <th>Teléfono</th>
-                    <th>Ingreso</th>
-                    <th>Estado</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var employee in _employees)
+    <div class="hf-page-header">
+        <div>
+            <p class="hf-page-subtitle">HumanFlow</p>
+            <h1 class="hf-page-title">Legajos</h1>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem">
+            <span class="hf-badge hf-badge-primary">@_employees.Count empleados</span>
+            @if (!_showForm)
+            {
+                <button class="btn btn-primary" @onclick="() => _showForm = true">+ Nueva alta</button>
+            }
+        </div>
+    </div>
+
+    @if (_showForm)
+    {
+        <div class="hf-section" style="margin-bottom:1.5rem">
+            <div class="hf-add-form">
+                <p class="hf-add-form-title">Alta de legajo</p>
+
+                @if (!string.IsNullOrEmpty(_formError))
                 {
-                    <tr>
-                        <td><span class="hf-table-code">@employee.EmployeeNumber</span></td>
-                        <td>
-                            <a href="employees/@employee.Id"
-                               style="font-weight:700;color:var(--color-foreground);text-decoration:none">
-                                @employee.FullName
-                            </a>
-                        </td>
-                        <td style="color:var(--color-foreground-muted)">@employee.Email</td>
-                        <td style="color:var(--color-foreground-muted)">@employee.Phone</td>
-                        <td style="color:var(--color-foreground-muted)">@employee.HireDate?.ToString("dd/MM/yyyy")</td>
-                        <td><span class="@StatusClass(employee.Status)">@StatusLabel(employee.Status)</span></td>
-                        <td style="text-align:right">
-                            <a href="employees/@employee.Id"
-                               class="hf-badge hf-badge-primary"
-                               style="cursor:pointer;text-decoration:none">
-                                Ver legajo
-                            </a>
-                        </td>
-                    </tr>
+                    <div class="hf-alert-error" style="margin-bottom:.75rem">@_formError</div>
                 }
-            </tbody>
-        </table>
+
+                <div class="hf-form-grid">
+                    <!-- Nombre y apellido -->
+                    <div>
+                        <label class="hf-field-label form-label">
+                            Apellido <span style="color:var(--color-destructive)">*</span>
+                        </label>
+                        <input class="form-control form-control-sm @(HasError("LastName") ? "is-invalid" : "")"
+                               @bind="_nf.LastName"
+                               @bind:event="oninput"
+                               placeholder="Ej: García" />
+                        @if (HasError("LastName"))
+                        {
+                            <div class="invalid-feedback d-block">@_errors["LastName"]</div>
+                        }
+                    </div>
+                    <div>
+                        <label class="hf-field-label form-label">
+                            Nombre <span style="color:var(--color-destructive)">*</span>
+                        </label>
+                        <input class="form-control form-control-sm @(HasError("FirstName") ? "is-invalid" : "")"
+                               @bind="_nf.FirstName"
+                               @bind:event="oninput"
+                               placeholder="Ej: María" />
+                        @if (HasError("FirstName"))
+                        {
+                            <div class="invalid-feedback d-block">@_errors["FirstName"]</div>
+                        }
+                    </div>
+
+                    <!-- Email corporativo -->
+                    <div>
+                        <label class="hf-field-label form-label">Email corporativo</label>
+                        <input class="form-control form-control-sm @(HasError("Email") ? "is-invalid" : "")"
+                               type="email"
+                               @bind="_nf.Email"
+                               @bind:event="oninput"
+                               placeholder="nombre@empresa.com" />
+                        @if (HasError("Email"))
+                        {
+                            <div class="invalid-feedback d-block">@_errors["Email"]</div>
+                        }
+                    </div>
+
+                    <!-- Teléfono -->
+                    <div>
+                        <label class="hf-field-label form-label">Teléfono</label>
+                        <input class="form-control form-control-sm" @bind="_nf.Phone" placeholder="+54 11 0000-0000" />
+                    </div>
+
+                    <!-- Puesto -->
+                    <div>
+                        <label class="hf-field-label form-label">Puesto</label>
+                        <select class="form-select form-select-sm" @bind="_nf.JobPositionId">
+                            <option value="">— Sin puesto —</option>
+                            @foreach (var p in _jobPositions)
+                            {
+                                <option value="@p.Id">@p.Title</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Área -->
+                    <div>
+                        <label class="hf-field-label form-label">Área</label>
+                        <select class="form-select form-select-sm" @bind="_nf.OrganizationUnitId">
+                            <option value="">— Sin área —</option>
+                            @foreach (var u in _orgUnits)
+                            {
+                                <option value="@u.Id">@u.Name</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Estado inicial -->
+                    <div>
+                        <label class="hf-field-label form-label">Estado inicial</label>
+                        <InputSelect TValue="EmployeeStatus" @bind-Value="_nf.Status" class="form-select form-select-sm">
+                            <option value="@EmployeeStatus.Draft">Borrador</option>
+                            <option value="@EmployeeStatus.Active">Activo</option>
+                        </InputSelect>
+                    </div>
+
+                    <!-- Fecha de ingreso (requerida si Activo) -->
+                    <div>
+                        <label class="hf-field-label form-label">
+                            Fecha de ingreso
+                            @if (_nf.Status == EmployeeStatus.Active)
+                            {
+                                <span style="color:var(--color-destructive)"> *</span>
+                            }
+                        </label>
+                        <InputDate TValue="DateOnly?" @bind-Value="_nf.HireDate"
+                                   class="@($"form-control form-control-sm {(HasError("HireDate") ? "is-invalid" : "")}")" />
+                        @if (HasError("HireDate"))
+                        {
+                            <div class="invalid-feedback d-block">@_errors["HireDate"]</div>
+                        }
+                    </div>
+                </div>
+
+                <div class="hf-form-actions">
+                    <button class="btn btn-primary btn-sm" @onclick="SaveEmployee">Crear legajo</button>
+                    <button class="btn-hf-secondary" @onclick="CancelForm">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="hf-section">
+        @if (_employees.Count == 0)
+        {
+            <div class="hf-section-body" style="padding:3rem;text-align:center;color:var(--color-foreground-muted)">
+                No hay legajos. Usá el botón <strong>+ Nueva alta</strong> para crear el primero.
+            </div>
+        }
+        else
+        {
+            <div class="hf-table-wrapper">
+                <table class="hf-table">
+                    <thead>
+                        <tr>
+                            <th>Legajo</th>
+                            <th>Nombre</th>
+                            <th>Email</th>
+                            <th>Teléfono</th>
+                            <th>Ingreso</th>
+                            <th>Estado</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var employee in _employees)
+                        {
+                            <tr>
+                                <td><span class="hf-table-code">@employee.EmployeeNumber</span></td>
+                                <td>
+                                    <a href="employees/@employee.Id"
+                                       style="font-weight:700;color:var(--color-foreground);text-decoration:none">
+                                        @employee.FullName
+                                    </a>
+                                </td>
+                                <td style="color:var(--color-foreground-muted)">@employee.Email</td>
+                                <td style="color:var(--color-foreground-muted)">@employee.Phone</td>
+                                <td style="color:var(--color-foreground-muted)">@employee.HireDate?.ToString("dd/MM/yyyy")</td>
+                                <td><span class="@StatusClass(employee.Status)">@StatusLabel(employee.Status)</span></td>
+                                <td style="text-align:right">
+                                    <a href="employees/@employee.Id"
+                                       class="btn-hf-secondary"
+                                       style="padding:.25rem .75rem;font-size:.75rem;text-decoration:none;display:inline-block">
+                                        Ver legajo
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
     </div>
 }
 
 @code {
-    private List<Employee>? _employees;
+    private bool _loading = true;
+    private bool _showForm;
+    private string? _formError;
+    private Dictionary<string, string> _errors = new();
+    private List<Employee> _employees = [];
+    private List<JobPosition> _jobPositions = [];
+    private List<OrganizationUnit> _orgUnits = [];
+    private NewEmployeeForm _nf = new();
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync() => await LoadAll();
+
+    private async Task LoadAll()
     {
+        _loading = true;
+        var tid = await DbContext.Tenants.Select(t => t.Id).FirstOrDefaultAsync();
+
         _employees = await DbContext.Employees
-            .Where(e => !e.IsDeleted)
-            .OrderBy(x => x.LastName)
-            .ThenBy(x => x.FirstName)
+            .Where(e => e.TenantId == tid && !e.IsDeleted)
+            .OrderBy(e => e.LastName)
+            .ThenBy(e => e.FirstName)
             .ToListAsync();
+
+        _jobPositions = await DbContext.JobPositions
+            .Where(j => j.TenantId == tid && j.IsActive)
+            .OrderBy(j => j.Title)
+            .ToListAsync();
+
+        _orgUnits = await DbContext.OrganizationUnits
+            .Where(u => u.TenantId == tid)
+            .OrderBy(u => u.Name)
+            .ToListAsync();
+
+        _loading = false;
     }
 
-    private static string StatusClass(EmployeeStatus status) =>
-        status switch
+    private bool Validate()
+    {
+        _errors.Clear();
+
+        if (string.IsNullOrWhiteSpace(_nf.LastName))
+            _errors["LastName"] = "El apellido es obligatorio.";
+
+        if (string.IsNullOrWhiteSpace(_nf.FirstName))
+            _errors["FirstName"] = "El nombre es obligatorio.";
+
+        if (!string.IsNullOrEmpty(_nf.Email) && !IsValidEmail(_nf.Email))
+            _errors["Email"] = "El formato del email no es válido.";
+
+        if (_nf.Status == EmployeeStatus.Active && _nf.HireDate is null)
+            _errors["HireDate"] = "La fecha de ingreso es obligatoria para empleados activos.";
+
+        return _errors.Count == 0;
+    }
+
+    private async Task SaveEmployee()
+    {
+        _formError = null;
+        if (!Validate()) return;
+
+        var tid = await DbContext.Tenants.Select(t => t.Id).FirstOrDefaultAsync();
+        var totalCount = await DbContext.Employees.CountAsync(e => e.TenantId == tid);
+        var empNumber = $"EMP-{totalCount + 1:D4}";
+
+        var jobPositionId = ToGuid(_nf.JobPositionId);
+        var orgUnitId = ToGuid(_nf.OrganizationUnitId);
+
+        var employee = new Employee
         {
-            EmployeeStatus.Active     => "hf-badge hf-badge-success",
-            EmployeeStatus.OnLeave    => "hf-badge hf-badge-warning",
-            EmployeeStatus.Terminated => "hf-badge hf-badge-danger",
-            EmployeeStatus.Archived   => "hf-badge hf-badge-neutral",
-            _                         => "hf-badge hf-badge-neutral"
+            TenantId = tid,
+            EmployeeNumber = empNumber,
+            FirstName = _nf.FirstName.Trim(),
+            LastName = _nf.LastName.Trim(),
+            Email = string.IsNullOrWhiteSpace(_nf.Email) ? null : _nf.Email.Trim().ToLowerInvariant(),
+            Phone = string.IsNullOrWhiteSpace(_nf.Phone) ? null : _nf.Phone.Trim(),
+            Status = _nf.Status,
+            HireDate = _nf.HireDate,
+            JobPositionId = jobPositionId,
+            OrganizationUnitId = orgUnitId
         };
 
-    private static string StatusLabel(EmployeeStatus status) =>
-        status switch
+        DbContext.Employees.Add(employee);
+
+        // Create initial position history when there's something to record
+        if (_nf.Status == EmployeeStatus.Active && (jobPositionId.HasValue || orgUnitId.HasValue))
         {
-            EmployeeStatus.Active     => "Activo",
-            EmployeeStatus.OnLeave    => "Licencia",
-            EmployeeStatus.Terminated => "Baja",
-            EmployeeStatus.Archived   => "Archivado",
-            EmployeeStatus.Draft      => "Borrador",
-            _                         => status.ToString()
-        };
+            DbContext.PositionHistories.Add(new PositionHistory
+            {
+                TenantId = tid,
+                EmployeeId = employee.Id,
+                JobPositionId = jobPositionId,
+                OrganizationUnitId = orgUnitId,
+                StartDate = _nf.HireDate!.Value,
+                Reason = PositionChangeReason.Hire
+            });
+        }
+
+        await DbContext.SaveChangesAsync();
+        Nav.NavigateTo($"/employees/{employee.Id}");
+    }
+
+    private void CancelForm()
+    {
+        _showForm = false;
+        _formError = null;
+        _errors.Clear();
+        _nf = new();
+    }
+
+    private bool HasError(string field) => _errors.ContainsKey(field);
+
+    private static bool IsValidEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return false;
+        return Regex.IsMatch(email.Trim(), @"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$",
+            RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
+    }
+
+    private static Guid? ToGuid(string? s) =>
+        Guid.TryParse(s, out var g) ? g : null;
+
+    private static string StatusClass(EmployeeStatus s) => s switch
+    {
+        EmployeeStatus.Active     => "hf-badge hf-badge-success",
+        EmployeeStatus.OnLeave    => "hf-badge hf-badge-warning",
+        EmployeeStatus.Terminated => "hf-badge hf-badge-danger",
+        EmployeeStatus.Archived   => "hf-badge hf-badge-neutral",
+        _                         => "hf-badge hf-badge-neutral"
+    };
+
+    private static string StatusLabel(EmployeeStatus s) => s switch
+    {
+        EmployeeStatus.Active     => "Activo",
+        EmployeeStatus.OnLeave    => "Licencia",
+        EmployeeStatus.Terminated => "Baja",
+        EmployeeStatus.Archived   => "Archivado",
+        EmployeeStatus.Draft      => "Borrador",
+        _                         => s.ToString()
+    };
+
+    private sealed class NewEmployeeForm
+    {
+        public string LastName { get; set; } = "";
+        public string FirstName { get; set; } = "";
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public string JobPositionId { get; set; } = "";
+        public string OrganizationUnitId { get; set; } = "";
+        public EmployeeStatus Status { get; set; } = EmployeeStatus.Active;
+        public DateOnly? HireDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    }
 }

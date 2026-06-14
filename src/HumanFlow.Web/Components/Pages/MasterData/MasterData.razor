@@ -1,64 +1,1032 @@
 @page "/master-data"
+@rendermode InteractiveServer
+@using HumanFlow.Domain.Geography
 @using HumanFlow.Domain.Organization
+@using HumanFlow.Domain.Tenancy
 @using HumanFlow.Web.Data
 @using Microsoft.EntityFrameworkCore
 @inject ApplicationDbContext DbContext
 
 <PageTitle>Datos maestros</PageTitle>
 
-<h1>Datos maestros</h1>
-<p class="text-muted">Areas, puestos y catalogos base para operar el legajo.</p>
-
-<div class="row g-3">
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header">Unidades organizativas</div>
-            <div class="card-body">
-                @if (_organizationUnits is null)
-                {
-                    <p>Cargando...</p>
-                }
-                else
-                {
-                    <ul class="list-group list-group-flush">
-                        @foreach (var unit in _organizationUnits)
-                        {
-                            <li class="list-group-item">@unit.Code - @unit.Name</li>
-                        }
-                    </ul>
-                }
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header">Puestos</div>
-            <div class="card-body">
-                @if (_jobPositions is null)
-                {
-                    <p>Cargando...</p>
-                }
-                else
-                {
-                    <ul class="list-group list-group-flush">
-                        @foreach (var position in _jobPositions)
-                        {
-                            <li class="list-group-item">@position.Code - @position.Title</li>
-                        }
-                    </ul>
-                }
-            </div>
-        </div>
-    </div>
+<div class="d-flex align-items-center mb-1">
+    <h1 class="mb-0">Datos maestros</h1>
 </div>
+<p class="text-muted mb-4">Catálogos base del sistema: organización y geografía.</p>
+
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <button type="button" class="nav-link @TabClass("orgunits")" @onclick='()=>SetTab("orgunits")'>
+            Unidades org.
+        </button>
+    </li>
+    <li class="nav-item">
+        <button type="button" class="nav-link @TabClass("positions")" @onclick='()=>SetTab("positions")'>
+            Puestos
+        </button>
+    </li>
+    <li class="nav-item">
+        <button type="button" class="nav-link @TabClass("countries")" @onclick='()=>SetTab("countries")'>
+            Países
+        </button>
+    </li>
+    <li class="nav-item">
+        <button type="button" class="nav-link @TabClass("cities")" @onclick='()=>SetTab("cities")'>
+            Ciudades
+        </button>
+    </li>
+    <li class="nav-item">
+        <button type="button" class="nav-link @TabClass("localities")" @onclick='()=>SetTab("localities")'>
+            Localidades
+        </button>
+    </li>
+</ul>
+
+@if (_loading)
+{
+    <p class="text-muted"><em>Cargando...</em></p>
+}
+else
+{
+    @* ── Unidades organizativas ───────────────────────────────── *@
+    @if (_tab == "orgunits")
+    {
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small">@_orgUnits.Count unidad(es)</span>
+            <button class="btn btn-sm btn-primary"
+                    @onclick="()=>{ _showAddOrgUnit=true; _newOrgUnit=new(); _errors.Clear(); }">
+                + Nueva unidad
+            </button>
+        </div>
+
+        @if (_showAddOrgUnit)
+        {
+            <div class="hf-add-form mb-3">
+                <div class="hf-add-form-title">Nueva unidad organizativa</div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-sm-5">
+                        <label class="form-label form-label-sm mb-1">Nombre *</label>
+                        <input class="form-control form-control-sm @ErrClass("OUName")"
+                               @bind="_newOrgUnit.Name" @bind:event="oninput"
+                               placeholder="Ej. Recursos Humanos" />
+                        @if (HasError("OUName")) { <div class="invalid-feedback d-block">@_errors["OUName"]</div> }
+                    </div>
+                    <div class="col-sm-2">
+                        <label class="form-label form-label-sm mb-1">Código</label>
+                        <input class="form-control form-control-sm" maxlength="20"
+                               @bind="_newOrgUnit.Code" @bind:event="oninput"
+                               placeholder="HR" />
+                    </div>
+                    <div class="col-sm-3 d-flex gap-2">
+                        <button class="btn btn-sm btn-success" @onclick="SaveOrgUnit">Guardar</button>
+                        <button class="btn btn-sm btn-outline-secondary"
+                                @onclick="()=>{ _showAddOrgUnit=false; _errors.Clear(); }">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <table class="table table-sm table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>Código</th>
+                    <th>Nombre</th>
+                    <th style="width:120px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var u in _orgUnits)
+                {
+                    @if (_editOrgUnitId == u.Id)
+                    {
+                        <tr class="table-warning">
+                            <td><input class="form-control form-control-sm" maxlength="20" @bind="_editOrgUnit.Code" @bind:event="oninput" /></td>
+                            <td><input class="form-control form-control-sm" @bind="_editOrgUnit.Name" @bind:event="oninput" /></td>
+                            <td>
+                                <button class="btn btn-xs btn-success me-1" @onclick="()=>UpdateOrgUnit(u.Id)">Guardar</button>
+                                <button class="btn btn-xs btn-outline-secondary" @onclick="()=>_editOrgUnitId=null">✕</button>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr>
+                            <td><span class="text-muted">@u.Code</span></td>
+                            <td>@u.Name</td>
+                            <td>
+                                <button class="btn btn-xs btn-outline-secondary me-1" @onclick="()=>StartEditOrgUnit(u)">Editar</button>
+                                <button class="btn btn-xs btn-outline-danger" @onclick="()=>_deleteOrgUnitId=u.Id">✕</button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+
+        @if (_deleteOrgUnitId.HasValue)
+        {
+            var ouName = _orgUnits.FirstOrDefault(x => x.Id == _deleteOrgUnitId)?.Name ?? "";
+            <div class="hf-delete-overlay">
+                <div class="hf-delete-box">
+                    <p>¿Eliminar la unidad <strong>@ouName</strong>?</p>
+                    <div class="d-flex gap-2 justify-content-end mt-3">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="()=>_deleteOrgUnitId=null">Cancelar</button>
+                        <button class="btn btn-sm btn-danger" @onclick="()=>DeleteOrgUnit(_deleteOrgUnitId!.Value)">Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    @* ── Puestos ───────────────────────────────────────────────── *@
+    @if (_tab == "positions")
+    {
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small">@_positions.Count puesto(s)</span>
+            <button class="btn btn-sm btn-primary"
+                    @onclick="()=>{ _showAddPosition=true; _newPosition=new(); _errors.Clear(); }">
+                + Nuevo puesto
+            </button>
+        </div>
+
+        @if (_showAddPosition)
+        {
+            <div class="hf-add-form mb-3">
+                <div class="hf-add-form-title">Nuevo puesto</div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-sm-5">
+                        <label class="form-label form-label-sm mb-1">Título *</label>
+                        <input class="form-control form-control-sm @ErrClass("PosTitle")"
+                               @bind="_newPosition.Title" @bind:event="oninput"
+                               placeholder="Ej. Gerente de RRHH" />
+                        @if (HasError("PosTitle")) { <div class="invalid-feedback d-block">@_errors["PosTitle"]</div> }
+                    </div>
+                    <div class="col-sm-2">
+                        <label class="form-label form-label-sm mb-1">Código</label>
+                        <input class="form-control form-control-sm" maxlength="20"
+                               @bind="_newPosition.Code" @bind:event="oninput"
+                               placeholder="GRH" />
+                    </div>
+                    <div class="col-sm-2 d-flex align-items-center pt-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="newPosActive"
+                                   @bind="_newPosition.IsActive" />
+                            <label class="form-check-label small" for="newPosActive">Activo</label>
+                        </div>
+                    </div>
+                    <div class="col-sm-3 d-flex gap-2">
+                        <button class="btn btn-sm btn-success" @onclick="SavePosition">Guardar</button>
+                        <button class="btn btn-sm btn-outline-secondary"
+                                @onclick="()=>{ _showAddPosition=false; _errors.Clear(); }">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <table class="table table-sm table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>Código</th>
+                    <th>Título</th>
+                    <th>Estado</th>
+                    <th style="width:120px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in _positions)
+                {
+                    @if (_editPositionId == p.Id)
+                    {
+                        <tr class="table-warning">
+                            <td><input class="form-control form-control-sm" maxlength="20" @bind="_editPosition.Code" @bind:event="oninput" /></td>
+                            <td><input class="form-control form-control-sm" @bind="_editPosition.Title" @bind:event="oninput" /></td>
+                            <td>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" @bind="_editPosition.IsActive" />
+                                </div>
+                            </td>
+                            <td>
+                                <button class="btn btn-xs btn-success me-1" @onclick="()=>UpdatePosition(p.Id)">Guardar</button>
+                                <button class="btn btn-xs btn-outline-secondary" @onclick="()=>_editPositionId=null">✕</button>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr>
+                            <td><span class="text-muted">@p.Code</span></td>
+                            <td>@p.Title</td>
+                            <td>
+                                @if (p.IsActive) { <span class="badge bg-success-subtle text-success-emphasis">Activo</span> }
+                                else { <span class="badge bg-secondary-subtle text-secondary-emphasis">Inactivo</span> }
+                            </td>
+                            <td>
+                                <button class="btn btn-xs btn-outline-secondary me-1" @onclick="()=>StartEditPosition(p)">Editar</button>
+                                <button class="btn btn-xs btn-outline-danger" @onclick="()=>_deletePositionId=p.Id">✕</button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+
+        @if (_deletePositionId.HasValue)
+        {
+            var posTitle = _positions.FirstOrDefault(x => x.Id == _deletePositionId)?.Title ?? "";
+            <div class="hf-delete-overlay">
+                <div class="hf-delete-box">
+                    <p>¿Eliminar el puesto <strong>@posTitle</strong>?</p>
+                    <div class="d-flex gap-2 justify-content-end mt-3">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="()=>_deletePositionId=null">Cancelar</button>
+                        <button class="btn btn-sm btn-danger" @onclick="()=>DeletePosition(_deletePositionId!.Value)">Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    @* ── Países ────────────────────────────────────────────────── *@
+    @if (_tab == "countries")
+    {
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small">@_countries.Count país(es)</span>
+            <button class="btn btn-sm btn-primary"
+                    @onclick="()=>{ _showAddCountry=true; _newCountry=new(); _errors.Clear(); }">
+                + Nuevo país
+            </button>
+        </div>
+
+        @if (_showAddCountry)
+        {
+            <div class="hf-add-form mb-3">
+                <div class="hf-add-form-title">Nuevo país</div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-sm-5">
+                        <label class="form-label form-label-sm mb-1">Nombre *</label>
+                        <input class="form-control form-control-sm @ErrClass("Name")"
+                               @bind="_newCountry.Name" @bind:event="oninput"
+                               placeholder="Ej. Argentina" />
+                        @if (HasError("Name")) { <div class="invalid-feedback d-block">@_errors["Name"]</div> }
+                    </div>
+                    <div class="col-sm-2">
+                        <label class="form-label form-label-sm mb-1">Código ISO</label>
+                        <input class="form-control form-control-sm" maxlength="3"
+                               @bind="_newCountry.IsoCode" @bind:event="oninput"
+                               placeholder="AR" />
+                    </div>
+                    <div class="col-sm-2">
+                        <div class="form-check ms-1">
+                            <input type="checkbox" class="form-check-input" id="newCtryActive"
+                                   @bind="_newCountry.IsActive" />
+                            <label class="form-check-label" for="newCtryActive">Activo</label>
+                        </div>
+                    </div>
+                    <div class="col-sm-3 d-flex gap-2">
+                        <button class="btn btn-sm btn-success" @onclick="SaveCountry">Guardar</button>
+                        <button class="btn btn-sm btn-outline-secondary"
+                                @onclick="()=>{ _showAddCountry=false; _errors.Clear(); }">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <table class="table table-sm table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>Nombre</th>
+                    <th>ISO</th>
+                    <th>Estado</th>
+                    <th style="width:130px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in _countries)
+                {
+                    @if (_editCountryId == c.Id)
+                    {
+                        <tr class="table-warning">
+                            <td><input class="form-control form-control-sm" @bind="_editCountry.Name" @bind:event="oninput" /></td>
+                            <td><input class="form-control form-control-sm" maxlength="3" @bind="_editCountry.IsoCode" @bind:event="oninput" /></td>
+                            <td>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" @bind="_editCountry.IsActive" />
+                                    <label class="form-check-label">Activo</label>
+                                </div>
+                            </td>
+                            <td>
+                                <button class="btn btn-xs btn-success me-1" @onclick="()=>UpdateCountry(c.Id)">Guardar</button>
+                                <button class="btn btn-xs btn-outline-secondary" @onclick="()=>_editCountryId=null">✕</button>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr>
+                            <td>@c.Name</td>
+                            <td><span class="text-muted">@c.IsoCode</span></td>
+                            <td>
+                                <span class="badge @(c.IsActive ? "bg-success" : "bg-secondary")">
+                                    @(c.IsActive ? "Activo" : "Inactivo")
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-xs btn-outline-secondary me-1" @onclick="()=>StartEditCountry(c)">Editar</button>
+                                <button class="btn btn-xs btn-outline-danger" @onclick="()=>_deleteCountryId=c.Id">✕</button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+
+        @if (_deleteCountryId.HasValue)
+        {
+            var countryName = _countries.FirstOrDefault(x => x.Id == _deleteCountryId)?.Name ?? "";
+            <div class="hf-delete-overlay">
+                <div class="hf-delete-box">
+                    <p>¿Eliminar el país <strong>@countryName</strong>?</p>
+                    <div class="d-flex gap-2 justify-content-end mt-3">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="()=>_deleteCountryId=null">Cancelar</button>
+                        <button class="btn btn-sm btn-danger" @onclick="()=>DeleteCountry(_deleteCountryId!.Value)">Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    @* ── Ciudades ──────────────────────────────────────────────── *@
+    @if (_tab == "cities")
+    {
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small">@_cities.Count ciudad(es)</span>
+            <button class="btn btn-sm btn-primary"
+                    @onclick="()=>{ _showAddCity=true; _newCity=new(); _errors.Clear(); }">
+                + Nueva ciudad
+            </button>
+        </div>
+
+        @if (_showAddCity)
+        {
+            <div class="hf-add-form mb-3">
+                <div class="hf-add-form-title">Nueva ciudad</div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-sm-3">
+                        <label class="form-label form-label-sm mb-1">País *</label>
+                        <select class="form-select form-select-sm @ErrClass("CountryId")" @bind="_newCity.CountryId">
+                            <option value="">-- Seleccione --</option>
+                            @foreach (var co in _countries)
+                            {
+                                <option value="@co.Id">@co.Name</option>
+                            }
+                        </select>
+                        @if (HasError("CountryId")) { <div class="invalid-feedback d-block">@_errors["CountryId"]</div> }
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label form-label-sm mb-1">Ciudad *</label>
+                        <input class="form-control form-control-sm @ErrClass("CityName")"
+                               @bind="_newCity.Name" @bind:event="oninput"
+                               placeholder="Ej. Córdoba" />
+                        @if (HasError("CityName")) { <div class="invalid-feedback d-block">@_errors["CityName"]</div> }
+                    </div>
+                    <div class="col-sm-2">
+                        <label class="form-label form-label-sm mb-1">Provincia / Estado</label>
+                        <input class="form-control form-control-sm"
+                               @bind="_newCity.StateName" @bind:event="oninput" />
+                    </div>
+                    <div class="col-sm-2">
+                        <div class="form-check ms-1 mt-3">
+                            <input type="checkbox" class="form-check-input" id="newCityActive" @bind="_newCity.IsActive" />
+                            <label class="form-check-label" for="newCityActive">Activo</label>
+                        </div>
+                    </div>
+                    <div class="col-sm-2 d-flex gap-2">
+                        <button class="btn btn-sm btn-success" @onclick="SaveCity">Guardar</button>
+                        <button class="btn btn-sm btn-outline-secondary"
+                                @onclick="()=>{ _showAddCity=false; _errors.Clear(); }">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <table class="table table-sm table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>País</th>
+                    <th>Ciudad</th>
+                    <th>Provincia / Estado</th>
+                    <th>Estado</th>
+                    <th style="width:130px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in _cities)
+                {
+                    @if (_editCityId == c.Id)
+                    {
+                        <tr class="table-warning">
+                            <td>
+                                <select class="form-select form-select-sm" @bind="_editCity.CountryId">
+                                    @foreach (var co in _countries)
+                                    {
+                                        <option value="@co.Id">@co.Name</option>
+                                    }
+                                </select>
+                            </td>
+                            <td><input class="form-control form-control-sm" @bind="_editCity.Name" @bind:event="oninput" /></td>
+                            <td><input class="form-control form-control-sm" @bind="_editCity.StateName" @bind:event="oninput" /></td>
+                            <td>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" @bind="_editCity.IsActive" />
+                                    <label class="form-check-label">Activo</label>
+                                </div>
+                            </td>
+                            <td>
+                                <button class="btn btn-xs btn-success me-1" @onclick="()=>UpdateCity(c.Id)">Guardar</button>
+                                <button class="btn btn-xs btn-outline-secondary" @onclick="()=>_editCityId=null">✕</button>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr>
+                            <td>@c.Country?.Name</td>
+                            <td>@c.Name</td>
+                            <td><span class="text-muted">@c.StateName</span></td>
+                            <td>
+                                <span class="badge @(c.IsActive ? "bg-success" : "bg-secondary")">
+                                    @(c.IsActive ? "Activo" : "Inactivo")
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-xs btn-outline-secondary me-1" @onclick="()=>StartEditCity(c)">Editar</button>
+                                <button class="btn btn-xs btn-outline-danger" @onclick="()=>_deleteCityId=c.Id">✕</button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+
+        @if (_deleteCityId.HasValue)
+        {
+            var cityName = _cities.FirstOrDefault(x => x.Id == _deleteCityId)?.Name ?? "";
+            <div class="hf-delete-overlay">
+                <div class="hf-delete-box">
+                    <p>¿Eliminar la ciudad <strong>@cityName</strong>?</p>
+                    <div class="d-flex gap-2 justify-content-end mt-3">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="()=>_deleteCityId=null">Cancelar</button>
+                        <button class="btn btn-sm btn-danger" @onclick="()=>DeleteCity(_deleteCityId!.Value)">Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    @* ── Localidades ───────────────────────────────────────────── *@
+    @if (_tab == "localities")
+    {
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small">@_localities.Count localidad(es)</span>
+            <button class="btn btn-sm btn-primary"
+                    @onclick="()=>{ _showAddLocality=true; _newLocality=new(); _errors.Clear(); }">
+                + Nueva localidad
+            </button>
+        </div>
+
+        @if (_showAddLocality)
+        {
+            <div class="hf-add-form mb-3">
+                <div class="hf-add-form-title">Nueva localidad</div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-sm-3">
+                        <label class="form-label form-label-sm mb-1">Ciudad *</label>
+                        <select class="form-select form-select-sm @ErrClass("LocalityCityId")" @bind="_newLocality.CityId">
+                            <option value="">-- Seleccione --</option>
+                            @foreach (var ci in _cities)
+                            {
+                                <option value="@ci.Id">@ci.Country?.Name — @ci.Name</option>
+                            }
+                        </select>
+                        @if (HasError("LocalityCityId")) { <div class="invalid-feedback d-block">@_errors["LocalityCityId"]</div> }
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label form-label-sm mb-1">Nombre *</label>
+                        <input class="form-control form-control-sm @ErrClass("LocalityName")"
+                               @bind="_newLocality.Name" @bind:event="oninput"
+                               placeholder="Ej. Palermo" />
+                        @if (HasError("LocalityName")) { <div class="invalid-feedback d-block">@_errors["LocalityName"]</div> }
+                    </div>
+                    <div class="col-sm-2">
+                        <label class="form-label form-label-sm mb-1">Código postal</label>
+                        <input class="form-control form-control-sm"
+                               @bind="_newLocality.PostalCode" @bind:event="oninput" />
+                    </div>
+                    <div class="col-sm-2">
+                        <div class="form-check ms-1 mt-3">
+                            <input type="checkbox" class="form-check-input" id="newLocActive" @bind="_newLocality.IsActive" />
+                            <label class="form-check-label" for="newLocActive">Activo</label>
+                        </div>
+                    </div>
+                    <div class="col-sm-2 d-flex gap-2">
+                        <button class="btn btn-sm btn-success" @onclick="SaveLocality">Guardar</button>
+                        <button class="btn btn-sm btn-outline-secondary"
+                                @onclick="()=>{ _showAddLocality=false; _errors.Clear(); }">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <table class="table table-sm table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>Ciudad</th>
+                    <th>Localidad</th>
+                    <th>Código postal</th>
+                    <th>Estado</th>
+                    <th style="width:130px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var l in _localities)
+                {
+                    @if (_editLocalityId == l.Id)
+                    {
+                        <tr class="table-warning">
+                            <td>
+                                <select class="form-select form-select-sm" @bind="_editLocality.CityId">
+                                    @foreach (var ci in _cities)
+                                    {
+                                        <option value="@ci.Id">@ci.Country?.Name — @ci.Name</option>
+                                    }
+                                </select>
+                            </td>
+                            <td><input class="form-control form-control-sm" @bind="_editLocality.Name" @bind:event="oninput" /></td>
+                            <td><input class="form-control form-control-sm" @bind="_editLocality.PostalCode" @bind:event="oninput" /></td>
+                            <td>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" @bind="_editLocality.IsActive" />
+                                    <label class="form-check-label">Activo</label>
+                                </div>
+                            </td>
+                            <td>
+                                <button class="btn btn-xs btn-success me-1" @onclick="()=>UpdateLocality(l.Id)">Guardar</button>
+                                <button class="btn btn-xs btn-outline-secondary" @onclick="()=>_editLocalityId=null">✕</button>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr>
+                            <td>@l.City?.Name</td>
+                            <td>@l.Name</td>
+                            <td><span class="text-muted">@l.PostalCode</span></td>
+                            <td>
+                                <span class="badge @(l.IsActive ? "bg-success" : "bg-secondary")">
+                                    @(l.IsActive ? "Activo" : "Inactivo")
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-xs btn-outline-secondary me-1" @onclick="()=>StartEditLocality(l)">Editar</button>
+                                <button class="btn btn-xs btn-outline-danger" @onclick="()=>_deleteLocalityId=l.Id">✕</button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+
+        @if (_deleteLocalityId.HasValue)
+        {
+            var localityName = _localities.FirstOrDefault(x => x.Id == _deleteLocalityId)?.Name ?? "";
+            <div class="hf-delete-overlay">
+                <div class="hf-delete-box">
+                    <p>¿Eliminar la localidad <strong>@localityName</strong>?</p>
+                    <div class="d-flex gap-2 justify-content-end mt-3">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="()=>_deleteLocalityId=null">Cancelar</button>
+                        <button class="btn btn-sm btn-danger" @onclick="()=>DeleteLocality(_deleteLocalityId!.Value)">Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+}
 
 @code {
-    private List<OrganizationUnit>? _organizationUnits;
-    private List<JobPosition>? _jobPositions;
+    // ── Estado UI ─────────────────────────────────────────────────────
+    private bool   _loading   = true;
+    private string _tab       = "countries";
+    private Guid   _tenantId;
+    private Dictionary<string, string> _errors = [];
 
+    // ── Listas ────────────────────────────────────────────────────────
+    private List<OrganizationUnit> _orgUnits   = [];
+    private List<JobPosition>      _positions  = [];
+    private List<Country>          _countries  = [];
+    private List<City>             _cities     = [];
+    private List<Locality>         _localities = [];
+
+    // ── Estado Countries ──────────────────────────────────────────────
+    private bool        _showAddCountry;
+    private CountryForm _newCountry  = new();
+    private Guid?       _editCountryId;
+    private CountryForm _editCountry = new();
+    private Guid?       _deleteCountryId;
+
+    // ── Estado Cities ─────────────────────────────────────────────────
+    private bool     _showAddCity;
+    private CityForm _newCity  = new();
+    private Guid?    _editCityId;
+    private CityForm _editCity = new();
+    private Guid?    _deleteCityId;
+
+    // ── Estado Localities ─────────────────────────────────────────────
+    private bool         _showAddLocality;
+    private LocalityForm _newLocality  = new();
+    private Guid?        _editLocalityId;
+    private LocalityForm _editLocality = new();
+    private Guid?        _deleteLocalityId;
+
+    // ── Estado OrgUnits ───────────────────────────────────────────────
+    private bool        _showAddOrgUnit;
+    private OrgUnitForm _newOrgUnit  = new();
+    private Guid?       _editOrgUnitId;
+    private OrgUnitForm _editOrgUnit = new();
+    private Guid?       _deleteOrgUnitId;
+
+    // ── Estado Positions ──────────────────────────────────────────────
+    private bool         _showAddPosition;
+    private PositionForm _newPosition  = new();
+    private Guid?        _editPositionId;
+    private PositionForm _editPosition = new();
+    private Guid?        _deletePositionId;
+
+    // ── Inicialización ────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
-        _organizationUnits = await DbContext.OrganizationUnits.OrderBy(x => x.Name).ToListAsync();
-        _jobPositions = await DbContext.JobPositions.OrderBy(x => x.Title).ToListAsync();
+        var tenant = await DbContext.Tenants.FirstOrDefaultAsync();
+        _tenantId = tenant?.Id ?? Guid.Empty;
+        await LoadAll();
+        _loading = false;
+    }
+
+    private async Task LoadAll()
+    {
+        await LoadOrgUnits();
+        await LoadPositions();
+        await LoadCountries();
+        await LoadCities();
+        await LoadLocalities();
+    }
+
+    private async Task LoadOrgUnits()
+        => _orgUnits = await DbContext.OrganizationUnits
+            .Where(x => x.TenantId == _tenantId && !x.IsDeleted)
+            .OrderBy(x => x.Name).ToListAsync();
+
+    private async Task LoadPositions()
+        => _positions = await DbContext.JobPositions
+            .Where(x => x.TenantId == _tenantId && !x.IsDeleted)
+            .OrderBy(x => x.Title).ToListAsync();
+
+    private async Task LoadCountries()
+        => _countries = await DbContext.Countries
+            .Where(x => x.TenantId == _tenantId && !x.IsDeleted)
+            .OrderBy(x => x.Name).ToListAsync();
+
+    private async Task LoadCities()
+        => _cities = await DbContext.Cities
+            .Include(x => x.Country)
+            .Where(x => x.TenantId == _tenantId && !x.IsDeleted)
+            .OrderBy(x => x.Country!.Name).ThenBy(x => x.Name).ToListAsync();
+
+    private async Task LoadLocalities()
+        => _localities = await DbContext.Localities
+            .Include(x => x.City).ThenInclude(x => x!.Country)
+            .Where(x => x.TenantId == _tenantId && !x.IsDeleted)
+            .OrderBy(x => x.City!.Name).ThenBy(x => x.Name).ToListAsync();
+
+    // ── Tab ───────────────────────────────────────────────────────────
+    private void SetTab(string tab)
+    {
+        _tab = tab;
+        _errors.Clear();
+        _showAddOrgUnit  = false;
+        _showAddPosition = false;
+        _showAddCountry  = false;
+        _showAddCity     = false;
+        _showAddLocality = false;
+        _editOrgUnitId   = null;
+        _editPositionId  = null;
+        _editCountryId   = null;
+        _editCityId      = null;
+        _editLocalityId  = null;
+    }
+
+    private string TabClass(string tab) => _tab == tab ? "active" : "";
+    private bool HasError(string f) => _errors.ContainsKey(f);
+    private string ErrClass(string f) => HasError(f) ? "is-invalid" : "";
+
+    // ── CRUD OrgUnits ─────────────────────────────────────────────────
+    private async Task SaveOrgUnit()
+    {
+        _errors.Clear();
+        if (string.IsNullOrWhiteSpace(_newOrgUnit.Name))
+            _errors["OUName"] = "El nombre es requerido.";
+        if (_errors.Count > 0) return;
+
+        DbContext.OrganizationUnits.Add(new OrganizationUnit
+        {
+            TenantId = _tenantId,
+            Name     = _newOrgUnit.Name.Trim(),
+            Code     = string.IsNullOrWhiteSpace(_newOrgUnit.Code) ? null : _newOrgUnit.Code.Trim()
+        });
+        await DbContext.SaveChangesAsync();
+        _showAddOrgUnit = false;
+        _newOrgUnit = new();
+        await LoadOrgUnits();
+    }
+
+    private void StartEditOrgUnit(OrganizationUnit u)
+    {
+        _editOrgUnitId = u.Id;
+        _editOrgUnit   = new() { Name = u.Name, Code = u.Code ?? "" };
+    }
+
+    private async Task UpdateOrgUnit(Guid id)
+    {
+        var entity = await DbContext.OrganizationUnits.FindAsync(id);
+        if (entity is null) return;
+        entity.Name      = _editOrgUnit.Name.Trim();
+        entity.Code      = string.IsNullOrWhiteSpace(_editOrgUnit.Code) ? null : _editOrgUnit.Code.Trim();
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await DbContext.SaveChangesAsync();
+        _editOrgUnitId = null;
+        await LoadOrgUnits();
+    }
+
+    private async Task DeleteOrgUnit(Guid id)
+    {
+        var entity = await DbContext.OrganizationUnits.FindAsync(id);
+        if (entity is null) return;
+        entity.IsDeleted = true;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await DbContext.SaveChangesAsync();
+        _deleteOrgUnitId = null;
+        await LoadOrgUnits();
+    }
+
+    // ── CRUD Positions ────────────────────────────────────────────────
+    private async Task SavePosition()
+    {
+        _errors.Clear();
+        if (string.IsNullOrWhiteSpace(_newPosition.Title))
+            _errors["PosTitle"] = "El título es requerido.";
+        if (_errors.Count > 0) return;
+
+        DbContext.JobPositions.Add(new JobPosition
+        {
+            TenantId = _tenantId,
+            Title    = _newPosition.Title.Trim(),
+            Code     = string.IsNullOrWhiteSpace(_newPosition.Code) ? null : _newPosition.Code.Trim(),
+            IsActive = _newPosition.IsActive
+        });
+        await DbContext.SaveChangesAsync();
+        _showAddPosition = false;
+        _newPosition = new();
+        await LoadPositions();
+    }
+
+    private void StartEditPosition(JobPosition p)
+    {
+        _editPositionId = p.Id;
+        _editPosition   = new() { Title = p.Title, Code = p.Code ?? "", IsActive = p.IsActive };
+    }
+
+    private async Task UpdatePosition(Guid id)
+    {
+        var entity = await DbContext.JobPositions.FindAsync(id);
+        if (entity is null) return;
+        entity.Title     = _editPosition.Title.Trim();
+        entity.Code      = string.IsNullOrWhiteSpace(_editPosition.Code) ? null : _editPosition.Code.Trim();
+        entity.IsActive  = _editPosition.IsActive;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await DbContext.SaveChangesAsync();
+        _editPositionId = null;
+        await LoadPositions();
+    }
+
+    private async Task DeletePosition(Guid id)
+    {
+        var entity = await DbContext.JobPositions.FindAsync(id);
+        if (entity is null) return;
+        entity.IsDeleted = true;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await DbContext.SaveChangesAsync();
+        _deletePositionId = null;
+        await LoadPositions();
+    }
+
+    // ── CRUD Countries ────────────────────────────────────────────────
+    private async Task SaveCountry()
+    {
+        _errors.Clear();
+        if (string.IsNullOrWhiteSpace(_newCountry.Name))
+            _errors["Name"] = "El nombre es requerido.";
+        if (_errors.Count > 0) return;
+
+        DbContext.Countries.Add(new Country
+        {
+            TenantId = _tenantId,
+            Name     = _newCountry.Name.Trim(),
+            IsoCode  = string.IsNullOrWhiteSpace(_newCountry.IsoCode) ? null
+                           : _newCountry.IsoCode.Trim().ToUpperInvariant(),
+            IsActive = _newCountry.IsActive
+        });
+        await DbContext.SaveChangesAsync();
+        _showAddCountry = false;
+        _newCountry = new();
+        await LoadCountries();
+    }
+
+    private void StartEditCountry(Country c)
+    {
+        _editCountryId = c.Id;
+        _editCountry   = new() { Name = c.Name, IsoCode = c.IsoCode ?? "", IsActive = c.IsActive };
+    }
+
+    private async Task UpdateCountry(Guid id)
+    {
+        var entity = await DbContext.Countries.FindAsync(id);
+        if (entity is null) return;
+        entity.Name      = _editCountry.Name.Trim();
+        entity.IsoCode   = string.IsNullOrWhiteSpace(_editCountry.IsoCode) ? null
+                               : _editCountry.IsoCode.Trim().ToUpperInvariant();
+        entity.IsActive  = _editCountry.IsActive;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await DbContext.SaveChangesAsync();
+        _editCountryId = null;
+        await LoadCountries();
+    }
+
+    private async Task DeleteCountry(Guid id)
+    {
+        var entity = await DbContext.Countries.FindAsync(id);
+        if (entity is null) return;
+        entity.IsDeleted = true;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await DbContext.SaveChangesAsync();
+        _deleteCountryId = null;
+        await LoadCountries();
+    }
+
+    // ── CRUD Cities ───────────────────────────────────────────────────
+    private async Task SaveCity()
+    {
+        _errors.Clear();
+        if (string.IsNullOrWhiteSpace(_newCity.CountryId))
+            _errors["CountryId"] = "Seleccione un país.";
+        if (string.IsNullOrWhiteSpace(_newCity.Name))
+            _errors["CityName"] = "El nombre es requerido.";
+        if (_errors.Count > 0) return;
+
+        DbContext.Cities.Add(new City
+        {
+            TenantId  = _tenantId,
+            CountryId = Guid.Parse(_newCity.CountryId),
+            Name      = _newCity.Name.Trim(),
+            StateName = string.IsNullOrWhiteSpace(_newCity.StateName) ? null : _newCity.StateName.Trim(),
+            IsActive  = _newCity.IsActive
+        });
+        await DbContext.SaveChangesAsync();
+        _showAddCity = false;
+        _newCity = new();
+        await LoadCities();
+    }
+
+    private void StartEditCity(City c)
+    {
+        _editCityId = c.Id;
+        _editCity   = new() { CountryId = c.CountryId.ToString(), Name = c.Name, StateName = c.StateName ?? "", IsActive = c.IsActive };
+    }
+
+    private async Task UpdateCity(Guid id)
+    {
+        var entity = await DbContext.Cities.FindAsync(id);
+        if (entity is null) return;
+        if (Guid.TryParse(_editCity.CountryId, out var countryGuid))
+            entity.CountryId = countryGuid;
+        entity.Name      = _editCity.Name.Trim();
+        entity.StateName = string.IsNullOrWhiteSpace(_editCity.StateName) ? null : _editCity.StateName.Trim();
+        entity.IsActive  = _editCity.IsActive;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await DbContext.SaveChangesAsync();
+        _editCityId = null;
+        await LoadCities();
+    }
+
+    private async Task DeleteCity(Guid id)
+    {
+        var entity = await DbContext.Cities.FindAsync(id);
+        if (entity is null) return;
+        entity.IsDeleted = true;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await DbContext.SaveChangesAsync();
+        _deleteCityId = null;
+        await LoadCities();
+    }
+
+    // ── CRUD Localities ───────────────────────────────────────────────
+    private async Task SaveLocality()
+    {
+        _errors.Clear();
+        if (string.IsNullOrWhiteSpace(_newLocality.CityId))
+            _errors["LocalityCityId"] = "Seleccione una ciudad.";
+        if (string.IsNullOrWhiteSpace(_newLocality.Name))
+            _errors["LocalityName"] = "El nombre es requerido.";
+        if (_errors.Count > 0) return;
+
+        DbContext.Localities.Add(new Locality
+        {
+            TenantId   = _tenantId,
+            CityId     = Guid.Parse(_newLocality.CityId),
+            Name       = _newLocality.Name.Trim(),
+            PostalCode = string.IsNullOrWhiteSpace(_newLocality.PostalCode) ? null : _newLocality.PostalCode.Trim(),
+            IsActive   = _newLocality.IsActive
+        });
+        await DbContext.SaveChangesAsync();
+        _showAddLocality = false;
+        _newLocality = new();
+        await LoadLocalities();
+    }
+
+    private void StartEditLocality(Locality l)
+    {
+        _editLocalityId = l.Id;
+        _editLocality   = new() { CityId = l.CityId.ToString(), Name = l.Name, PostalCode = l.PostalCode ?? "", IsActive = l.IsActive };
+    }
+
+    private async Task UpdateLocality(Guid id)
+    {
+        var entity = await DbContext.Localities.FindAsync(id);
+        if (entity is null) return;
+        if (Guid.TryParse(_editLocality.CityId, out var cityGuid))
+            entity.CityId = cityGuid;
+        entity.Name       = _editLocality.Name.Trim();
+        entity.PostalCode = string.IsNullOrWhiteSpace(_editLocality.PostalCode) ? null : _editLocality.PostalCode.Trim();
+        entity.IsActive   = _editLocality.IsActive;
+        entity.UpdatedAt  = DateTimeOffset.UtcNow;
+        await DbContext.SaveChangesAsync();
+        _editLocalityId = null;
+        await LoadLocalities();
+    }
+
+    private async Task DeleteLocality(Guid id)
+    {
+        var entity = await DbContext.Localities.FindAsync(id);
+        if (entity is null) return;
+        entity.IsDeleted = true;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await DbContext.SaveChangesAsync();
+        _deleteLocalityId = null;
+        await LoadLocalities();
+    }
+
+    // ── Modelos de formulario ─────────────────────────────────────────
+    private sealed class CountryForm
+    {
+        public string Name    { get; set; } = "";
+        public string IsoCode { get; set; } = "";
+        public bool   IsActive { get; set; } = true;
+    }
+
+    private sealed class CityForm
+    {
+        public string CountryId { get; set; } = "";
+        public string Name      { get; set; } = "";
+        public string StateName { get; set; } = "";
+        public bool   IsActive  { get; set; } = true;
+    }
+
+    private sealed class LocalityForm
+    {
+        public string CityId     { get; set; } = "";
+        public string Name       { get; set; } = "";
+        public string PostalCode { get; set; } = "";
+        public bool   IsActive   { get; set; } = true;
+    }
+
+    private sealed class OrgUnitForm
+    {
+        public string Name { get; set; } = "";
+        public string Code { get; set; } = "";
+    }
+
+    private sealed class PositionForm
+    {
+        public string Title    { get; set; } = "";
+        public string Code     { get; set; } = "";
+        public bool   IsActive { get; set; } = true;
     }
 }

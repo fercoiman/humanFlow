@@ -1,75 +1,501 @@
 @page "/contacts"
+@rendermode InteractiveServer
 @using HumanFlow.Domain.Contacts
 @using HumanFlow.Web.Data
 @using Microsoft.EntityFrameworkCore
+@using System.Text.RegularExpressions
 @inject ApplicationDbContext DbContext
 
 <PageTitle>Contactos — HumanFlow</PageTitle>
 
-<div class="hf-page-header">
-    <div>
-        <h1>Contactos</h1>
-        <p class="hf-page-subtitle">Contactos internos y externos reutilizables por RRHH.</p>
-    </div>
-    <span class="hf-badge hf-badge-primary">@(_contacts?.Count ?? 0) contactos</span>
-</div>
-
-@if (_contacts is null)
+@if (_loading)
 {
-    <div class="hf-loading">
-        <div class="hf-loading-spinner"></div>
-        Cargando contactos&hellip;
+    <div class="hf-loading-state">
+        <div class="hf-spinner"></div>
+        <span>Cargando contactos...</span>
     </div>
 }
 else
 {
-    <div class="hf-table-wrapper">
-        <table class="hf-table">
-            <thead>
-                <tr>
-                    <th>Nombre</th>
-                    <th>Clase</th>
-                    <th>Tipo</th>
-                    <th>Organización</th>
-                    <th>Email</th>
-                    <th>Teléfono</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var contact in _contacts)
-                {
-                    <tr>
-                        <td style="font-weight:600">@contact.DisplayName</td>
-                        <td>
-                            <span class="@KindClass(contact.Kind)">@contact.Kind</span>
-                        </td>
-                        <td style="color:var(--color-foreground-muted)">@contact.Type</td>
-                        <td style="color:var(--color-foreground-muted)">@contact.OrganizationName</td>
-                        <td style="color:var(--color-foreground-muted)">@contact.Email</td>
-                        <td style="color:var(--color-foreground-muted)">@contact.Phone</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+    <div class="hf-page-header">
+        <div>
+            <p class="hf-page-subtitle">HumanFlow</p>
+            <h1 class="hf-page-title">Contactos</h1>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem">
+            <span class="hf-badge hf-badge-primary">@_contacts.Count contactos</span>
+            @if (!_showCreateForm)
+            {
+                <button class="btn btn-primary" @onclick="OpenCreateForm">+ Nuevo contacto</button>
+            }
+        </div>
     </div>
+
+    @* ── Formulario de alta ── *@
+    @if (_showCreateForm)
+    {
+        <div class="hf-section" style="margin-bottom:1.5rem">
+            <div class="hf-add-form">
+                <p class="hf-add-form-title">Nuevo contacto</p>
+                @FormFields(_createForm)
+                <div class="hf-form-actions">
+                    <button class="btn btn-primary btn-sm" @onclick="SaveCreate">Guardar contacto</button>
+                    <button class="btn-hf-secondary" @onclick="CancelCreate">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ── Filtros ── *@
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap">
+        <input class="form-control form-control-sm" style="max-width:220px"
+               placeholder="Buscar por nombre u organización..."
+               @bind="_search" @bind:event="oninput" />
+        <div style="display:flex;gap:.375rem">
+            @foreach (var (label, val) in KindFilters)
+            {
+                var v = val;
+                <button class="@(_kindFilter == v ? "btn btn-primary btn-sm" : "btn-hf-secondary")"
+                        style="font-size:.75rem;padding:.25rem .75rem"
+                        @onclick="() => _kindFilter = v">
+                    @label
+                </button>
+            }
+        </div>
+        <div style="display:flex;align-items:center;gap:.375rem">
+            <input type="checkbox" id="chkInactive" class="form-check-input" @bind="_showInactive" />
+            <label for="chkInactive" style="font-size:.8125rem;color:var(--color-foreground-muted);margin:0">
+                Mostrar inactivos
+            </label>
+        </div>
+    </div>
+
+    @* ── Tabla ── *@
+    <div class="hf-section">
+        @if (FilteredContacts.Count == 0)
+        {
+            <div class="hf-section-body" style="padding:3rem;text-align:center;color:var(--color-foreground-muted)">
+                @(_contacts.Count == 0
+                    ? "No hay contactos. Creá el primero con el botón de arriba."
+                    : "Ningún contacto coincide con los filtros aplicados.")
+            </div>
+        }
+        else
+        {
+            <div class="hf-table-wrapper">
+                <table class="hf-table">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Clase</th>
+                            <th>Tipo</th>
+                            <th>Organización</th>
+                            <th>Email</th>
+                            <th>Teléfono</th>
+                            <th>Estado</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var contact in FilteredContacts)
+                        {
+                            var isEditing = _editingId == contact.Id;
+                            @if (!isEditing)
+                            {
+                                <tr>
+                                    <td style="font-weight:600">@contact.DisplayName</td>
+                                    <td><span class="@KindClass(contact.Kind)">@KindLabel(contact.Kind)</span></td>
+                                    <td style="color:var(--color-foreground-muted)">@TypeLabel(contact.Type)</td>
+                                    <td style="color:var(--color-foreground-muted)">@(contact.OrganizationName ?? "—")</td>
+                                    <td style="color:var(--color-foreground-muted)">
+                                        @if (!string.IsNullOrEmpty(contact.Email))
+                                        {
+                                            <a href="mailto:@contact.Email" style="color:inherit">@contact.Email</a>
+                                        }
+                                        else
+                                        {
+                                            <span>—</span>
+                                        }
+                                    </td>
+                                    <td style="color:var(--color-foreground-muted)">@(contact.Phone ?? "—")</td>
+                                    <td>
+                                        <span class="@(contact.IsActive ? "hf-badge hf-badge-success" : "hf-badge hf-badge-neutral")">
+                                            @(contact.IsActive ? "Activo" : "Inactivo")
+                                        </span>
+                                    </td>
+                                    <td style="text-align:right;white-space:nowrap">
+                                        <button class="btn-hf-secondary"
+                                                style="padding:.25rem .625rem;font-size:.75rem;margin-right:.25rem"
+                                                @onclick="() => StartEdit(contact)">
+                                            Editar
+                                        </button>
+                                        <button class="btn-hf-secondary"
+                                                style="padding:.25rem .625rem;font-size:.75rem;color:var(--color-destructive)"
+                                                @onclick="() => _confirmDelete = contact">
+                                            Eliminar
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="8" style="padding:0">
+                                        <div class="hf-add-form" style="margin:.75rem">
+                                            <p class="hf-add-form-title">Editar contacto</p>
+                                            @FormFields(_editForm)
+                                            <div class="hf-form-actions">
+                                                <button class="btn btn-primary btn-sm" @onclick="SaveEdit">Guardar cambios</button>
+                                                <button class="btn-hf-secondary" @onclick="CancelEdit">Cancelar</button>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    @* ── Confirmar eliminación ── *@
+    @if (_confirmDelete is not null)
+    {
+        <div style="position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000">
+            <div style="background:var(--color-surface);border-radius:.75rem;padding:1.75rem;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+                <h3 style="margin:0 0 .5rem;font-size:1rem;font-weight:700">Eliminar contacto</h3>
+                <p style="margin:0 0 1.25rem;color:var(--color-foreground-muted);font-size:.875rem">
+                    ¿Confirmar la eliminación de <strong>@_confirmDelete.DisplayName</strong>?
+                    Esta acción no puede deshacerse desde la interfaz.
+                </p>
+                <div style="display:flex;gap:.75rem;justify-content:flex-end">
+                    <button class="btn-hf-secondary" @onclick="() => _confirmDelete = null">Cancelar</button>
+                    <button class="btn btn-danger btn-sm" @onclick="ExecuteDelete">Eliminar</button>
+                </div>
+            </div>
+        </div>
+    }
 }
 
 @code {
-    private List<Contact>? _contacts;
+    // ───────── estado ─────────
+    private bool _loading = true;
+    private List<Contact> _contacts = [];
+    private Guid _tenantId;
 
-    protected override async Task OnInitializedAsync()
+    private bool _showCreateForm;
+    private ContactFormModel _createForm = new();
+
+    private Guid? _editingId;
+    private ContactFormModel _editForm = new();
+
+    private Dictionary<string, string> _errors = new();
+    private Contact? _confirmDelete;
+
+    private string _search = "";
+    private string? _kindFilter;
+    private bool _showInactive;
+
+    private static readonly (string Label, string? Value)[] KindFilters =
+    [
+        ("Todos",    null),
+        ("Internos", "Internal"),
+        ("Externos", "External"),
+    ];
+
+    // ───────── filtrado ─────────
+    private List<Contact> FilteredContacts
     {
-        _contacts = await DbContext.Contacts
-            .OrderBy(x => x.Kind)
-            .ThenBy(x => x.DisplayName)
-            .ToListAsync();
+        get
+        {
+            var q = _contacts.AsEnumerable();
+
+            if (!_showInactive)
+                q = q.Where(c => c.IsActive);
+
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                var s = _search.Trim();
+                q = q.Where(c =>
+                    c.DisplayName.Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                    (c.OrganizationName ?? "").Contains(s, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (_kindFilter is not null && Enum.TryParse<ContactKind>(_kindFilter, out var kind))
+                q = q.Where(c => c.Kind == kind);
+
+            return [.. q.OrderBy(c => c.Kind).ThenBy(c => c.DisplayName)];
+        }
     }
 
-    private static string KindClass(ContactKind kind) =>
-        kind switch
+    // ───────── carga ─────────
+    protected override async Task OnInitializedAsync() => await LoadAll();
+
+    private async Task LoadAll()
+    {
+        _loading = true;
+        _tenantId = await DbContext.Tenants.Select(t => t.Id).FirstOrDefaultAsync();
+
+        _contacts = await DbContext.Contacts
+            .Where(c => c.TenantId == _tenantId && !c.IsDeleted)
+            .OrderBy(c => c.Kind)
+            .ThenBy(c => c.DisplayName)
+            .ToListAsync();
+
+        _loading = false;
+    }
+
+    // ───────── alta ─────────
+    private void OpenCreateForm()
+    {
+        _editingId = null;
+        _createForm = new();
+        _errors.Clear();
+        _showCreateForm = true;
+    }
+
+    private async Task SaveCreate()
+    {
+        if (!Validate(_createForm)) return;
+
+        DbContext.Contacts.Add(new Contact
         {
-            ContactKind.Internal => "hf-badge hf-badge-primary",
-            ContactKind.External => "hf-badge hf-badge-neutral",
-            _                   => "hf-badge hf-badge-neutral"
+            TenantId = _tenantId,
+            DisplayName = _createForm.DisplayName!.Trim(),
+            Kind = _createForm.Kind,
+            Type = _createForm.Type,
+            OrganizationName = Trimmed(_createForm.OrganizationName),
+            Email = Trimmed(_createForm.Email?.ToLowerInvariant()),
+            Phone = Trimmed(_createForm.Phone),
+            Notes = Trimmed(_createForm.Notes),
+            IsActive = _createForm.IsActive
+        });
+
+        await DbContext.SaveChangesAsync();
+        _showCreateForm = false;
+        _createForm = new();
+        _errors.Clear();
+        await LoadAll();
+    }
+
+    private void CancelCreate()
+    {
+        _showCreateForm = false;
+        _createForm = new();
+        _errors.Clear();
+    }
+
+    // ───────── edición ─────────
+    private void StartEdit(Contact c)
+    {
+        _showCreateForm = false;
+        _errors.Clear();
+        _editingId = c.Id;
+        _editForm = new()
+        {
+            DisplayName = c.DisplayName,
+            Kind = c.Kind,
+            Type = c.Type,
+            OrganizationName = c.OrganizationName,
+            Email = c.Email,
+            Phone = c.Phone,
+            Notes = c.Notes,
+            IsActive = c.IsActive
         };
+    }
+
+    private async Task SaveEdit()
+    {
+        if (!Validate(_editForm)) return;
+
+        var entity = await DbContext.Contacts.FindAsync(_editingId!.Value);
+        if (entity is null) return;
+
+        entity.DisplayName = _editForm.DisplayName!.Trim();
+        entity.Kind = _editForm.Kind;
+        entity.Type = _editForm.Type;
+        entity.OrganizationName = Trimmed(_editForm.OrganizationName);
+        entity.Email = Trimmed(_editForm.Email?.ToLowerInvariant());
+        entity.Phone = Trimmed(_editForm.Phone);
+        entity.Notes = Trimmed(_editForm.Notes);
+        entity.IsActive = _editForm.IsActive;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await DbContext.SaveChangesAsync();
+        _editingId = null;
+        _errors.Clear();
+        await LoadAll();
+    }
+
+    private void CancelEdit()
+    {
+        _editingId = null;
+        _errors.Clear();
+    }
+
+    // ───────── eliminación ─────────
+    private async Task ExecuteDelete()
+    {
+        if (_confirmDelete is null) return;
+
+        var entity = await DbContext.Contacts.FindAsync(_confirmDelete.Id);
+        if (entity is not null)
+        {
+            entity.IsDeleted = true;
+            entity.UpdatedAt = DateTimeOffset.UtcNow;
+            await DbContext.SaveChangesAsync();
+        }
+
+        _confirmDelete = null;
+        await LoadAll();
+    }
+
+    // ───────── validación ─────────
+    private bool Validate(ContactFormModel f)
+    {
+        _errors.Clear();
+
+        if (string.IsNullOrWhiteSpace(f.DisplayName))
+            _errors["DisplayName"] = "El nombre es obligatorio.";
+
+        if (!string.IsNullOrEmpty(f.Email) && !IsValidEmail(f.Email))
+            _errors["Email"] = "El formato del email no es válido.";
+
+        return _errors.Count == 0;
+    }
+
+    private static bool IsValidEmail(string email) =>
+        Regex.IsMatch(email.Trim(), @"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$",
+            RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
+
+    private static string? Trimmed(string? s) =>
+        string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    // ───────── render fragment (campos de formulario) ─────────
+    private RenderFragment FormFields(ContactFormModel f) => __builder =>
+    {
+        <div class="hf-form-grid">
+            <div class="hf-form-grid-full">
+                <label class="hf-field-label form-label">
+                    Nombre completo / Razón social <span style="color:var(--color-destructive)">*</span>
+                </label>
+                <input class="form-control form-control-sm @(_errors.ContainsKey("DisplayName") ? "is-invalid" : "")"
+                       value="@f.DisplayName"
+                       @oninput="e => f.DisplayName = e.Value?.ToString()"
+                       placeholder="Ej: Consultora Legal SA" />
+                @if (_errors.TryGetValue("DisplayName", out var dnErr))
+                {
+                    <div class="invalid-feedback d-block">@dnErr</div>
+                }
+            </div>
+
+            <div>
+                <label class="hf-field-label form-label">Clase</label>
+                <InputSelect TValue="ContactKind" Value="f.Kind"
+                             ValueChanged="v => f.Kind = v"
+                             ValueExpression="() => f.Kind"
+                             class="form-select form-select-sm">
+                    <option value="@ContactKind.External">Externo</option>
+                    <option value="@ContactKind.Internal">Interno</option>
+                </InputSelect>
+            </div>
+
+            <div>
+                <label class="hf-field-label form-label">Tipo</label>
+                <InputSelect TValue="ContactType" Value="f.Type"
+                             ValueChanged="v => f.Type = v"
+                             ValueExpression="() => f.Type"
+                             class="form-select form-select-sm">
+                    @foreach (var t in Enum.GetValues<ContactType>())
+                    {
+                        <option value="@t">@TypeLabel(t)</option>
+                    }
+                </InputSelect>
+            </div>
+
+            <div>
+                <label class="hf-field-label form-label">Organización</label>
+                <input class="form-control form-control-sm"
+                       value="@f.OrganizationName"
+                       @oninput="e => f.OrganizationName = e.Value?.ToString()"
+                       placeholder="Nombre de la empresa (opcional)" />
+            </div>
+
+            <div>
+                <label class="hf-field-label form-label">Email</label>
+                <input class="form-control form-control-sm @(_errors.ContainsKey("Email") ? "is-invalid" : "")"
+                       type="email"
+                       value="@f.Email"
+                       @oninput="e => f.Email = e.Value?.ToString()"
+                       placeholder="contacto@empresa.com" />
+                @if (_errors.TryGetValue("Email", out var emailErr))
+                {
+                    <div class="invalid-feedback d-block">@emailErr</div>
+                }
+            </div>
+
+            <div>
+                <label class="hf-field-label form-label">Teléfono</label>
+                <input class="form-control form-control-sm"
+                       value="@f.Phone"
+                       @oninput="e => f.Phone = e.Value?.ToString()"
+                       placeholder="+54 11 0000-0000" />
+            </div>
+
+            <div class="hf-form-grid-full">
+                <label class="hf-field-label form-label">Notas</label>
+                <textarea class="form-control form-control-sm" rows="2"
+                          @bind="f.Notes"></textarea>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:.5rem">
+                <input type="checkbox" id="chkActive_@f.GetHashCode()" class="form-check-input"
+                       checked="@f.IsActive"
+                       @onchange="e => f.IsActive = (bool)(e.Value ?? true)" />
+                <label for="chkActive_@f.GetHashCode()" class="hf-field-label" style="margin:0">
+                    Contacto activo
+                </label>
+            </div>
+        </div>
+    };
+
+    // ───────── labels ─────────
+    private static string KindLabel(ContactKind k) => k switch
+    {
+        ContactKind.Internal => "Interno",
+        ContactKind.External => "Externo",
+        _                    => k.ToString()
+    };
+
+    private static string KindClass(ContactKind k) => k switch
+    {
+        ContactKind.Internal => "hf-badge hf-badge-primary",
+        _                    => "hf-badge hf-badge-neutral"
+    };
+
+    private static string TypeLabel(ContactType t) => t switch
+    {
+        ContactType.Emergency   => "Emergencia",
+        ContactType.Provider    => "Proveedor",
+        ContactType.Consultant  => "Consultor",
+        ContactType.Legal       => "Legal",
+        ContactType.Medical     => "Médico",
+        ContactType.Reference   => "Referencia",
+        ContactType.Operational => "Operativo",
+        _                       => t.ToString()
+    };
+
+    // ───────── modelo ─────────
+    private sealed class ContactFormModel
+    {
+        public string? DisplayName { get; set; }
+        public ContactKind Kind { get; set; } = ContactKind.External;
+        public ContactType Type { get; set; } = ContactType.Operational;
+        public string? OrganizationName { get; set; }
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public string? Notes { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
 }

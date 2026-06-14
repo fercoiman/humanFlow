@@ -1,6 +1,7 @@
 @page "/employees/{Id:guid}"
 @rendermode InteractiveServer
 @using HumanFlow.Domain.Employees
+@using HumanFlow.Domain.Geography
 @using HumanFlow.Domain.Organization
 @using HumanFlow.Web.Data
 @using Microsoft.EntityFrameworkCore
@@ -97,12 +98,19 @@ else
                     <FieldView Label="Estado civil" Value="@MaritalStatusLabel(_employee.MaritalStatus)" />
                     <FieldView Label="Nacionalidad" Value="@_employee.Nationality" />
 
+                    <div class="hf-section-divider">Lugar de nacimiento</div>
+                    <FieldView Label="País" Value="@GetCountryName(_employee.BirthCountryId)" />
+                    <FieldView Label="Provincia / Estado" Value="@GetStateName(_employee.BirthCityId)" />
+                    <FieldView Label="Ciudad" Value="@GetCityName(_employee.BirthCityId)" />
+                    <FieldView Label="Localidad" Value="@GetLocalityName(_employee.BirthLocalityId)" />
+
                     <div class="hf-section-divider">Domicilio</div>
                     <FieldView Label="Calle" Value="@_employee.AddressStreet" />
-                    <FieldView Label="Ciudad" Value="@_employee.AddressCity" />
-                    <FieldView Label="Provincia / Estado" Value="@_employee.AddressState" />
-                    <FieldView Label="Código postal" Value="@_employee.AddressPostalCode" />
-                    <FieldView Label="País" Value="@_employee.AddressCountry" />
+                    <FieldView Label="País" Value="@GetCountryName(_employee.CountryId)" />
+                    <FieldView Label="Provincia / Estado" Value="@GetStateName(_employee.CityId)" />
+                    <FieldView Label="Ciudad" Value="@GetCityName(_employee.CityId)" />
+                    <FieldView Label="Localidad" Value="@GetLocalityName(_employee.LocalityId)" />
+                    <FieldView Label="Código postal" Value="@GetPostalCode(_employee.LocalityId)" />
                 </div>
             }
             else
@@ -138,26 +146,72 @@ else
                             <input class="form-control form-control-sm" @bind="_pe.Nationality" />
                         </div>
 
+                        <div class="hf-section-divider">Lugar de nacimiento</div>
+                        <div>
+                            <label class="hf-field-label form-label">País de nacimiento</label>
+                            <select class="form-select form-select-sm" @bind="_pe.BirthCountryId" @bind:after="ResetBirthCity">
+                                <option value="">— Sin datos —</option>
+                                @foreach (var c in _countries)
+                                {
+                                    <option value="@c.Id">@c.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Ciudad de nacimiento</label>
+                            <select class="form-select form-select-sm" @bind="_pe.BirthCityId" @bind:after="ResetBirthLocality">
+                                <option value="">— Sin datos —</option>
+                                @foreach (var c in BirthCitiesFiltered)
+                                {
+                                    <option value="@c.Id">@c.Name @(string.IsNullOrEmpty(c.StateName) ? "" : $"({c.StateName})")</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Localidad de nacimiento</label>
+                            <select class="form-select form-select-sm" @bind="_pe.BirthLocalityId">
+                                <option value="">— Sin datos —</option>
+                                @foreach (var l in BirthLocalitiesFiltered)
+                                {
+                                    <option value="@l.Id">@l.Name</option>
+                                }
+                            </select>
+                        </div>
+
                         <div class="hf-section-divider">Domicilio</div>
                         <div class="hf-form-grid-full">
                             <label class="hf-field-label form-label">Calle / Dirección</label>
-                            <input class="form-control form-control-sm" @bind="_pe.AddressStreet" />
-                        </div>
-                        <div>
-                            <label class="hf-field-label form-label">Ciudad</label>
-                            <input class="form-control form-control-sm" @bind="_pe.AddressCity" />
-                        </div>
-                        <div>
-                            <label class="hf-field-label form-label">Provincia / Estado</label>
-                            <input class="form-control form-control-sm" @bind="_pe.AddressState" />
-                        </div>
-                        <div>
-                            <label class="hf-field-label form-label">Código postal</label>
-                            <input class="form-control form-control-sm" @bind="_pe.AddressPostalCode" />
+                            <input class="form-control form-control-sm" @bind="_pe.AddressStreet" @bind:event="oninput" />
                         </div>
                         <div>
                             <label class="hf-field-label form-label">País</label>
-                            <input class="form-control form-control-sm" @bind="_pe.AddressCountry" />
+                            <select class="form-select form-select-sm" @bind="_pe.AddressCountryId" @bind:after="ResetAddressCity">
+                                <option value="">— Sin datos —</option>
+                                @foreach (var c in _countries)
+                                {
+                                    <option value="@c.Id">@c.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Ciudad</label>
+                            <select class="form-select form-select-sm" @bind="_pe.AddressCityId" @bind:after="ResetAddressLocality">
+                                <option value="">— Sin datos —</option>
+                                @foreach (var c in AddressCitiesFiltered)
+                                {
+                                    <option value="@c.Id">@c.Name @(string.IsNullOrEmpty(c.StateName) ? "" : $"({c.StateName})")</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Localidad</label>
+                            <select class="form-select form-select-sm" @bind="_pe.AddressLocalityId">
+                                <option value="">— Sin datos —</option>
+                                @foreach (var l in AddressLocalitiesFiltered)
+                                {
+                                    <option value="@l.Id">@l.Name @(string.IsNullOrEmpty(l.PostalCode) ? "" : $"({l.PostalCode})")</option>
+                                }
+                            </select>
                         </div>
 
                         @if (!string.IsNullOrEmpty(_personalError))
@@ -726,6 +780,9 @@ else
     private List<JobPosition> _jobPositions = [];
     private List<OrganizationUnit> _orgUnits = [];
     private List<Employee> _allEmployees = [];
+    private List<Country>  _countries   = [];
+    private List<City>     _cities      = [];
+    private List<Locality> _localities  = [];
 
     private string _currentPositionLabel = "";
     private string _currentUnitLabel = "";
@@ -802,6 +859,18 @@ else
                 .OrderBy(e => e.LastName).ThenBy(e => e.FirstName)
                 .ToListAsync();
 
+            _countries  = await DbContext.Countries
+                .Where(c => c.TenantId == tid && !c.IsDeleted && c.IsActive)
+                .OrderBy(c => c.Name).ToListAsync();
+
+            _cities = await DbContext.Cities
+                .Where(c => c.TenantId == tid && !c.IsDeleted && c.IsActive)
+                .OrderBy(c => c.Name).ToListAsync();
+
+            _localities = await DbContext.Localities
+                .Where(l => l.TenantId == tid && !l.IsDeleted && l.IsActive)
+                .OrderBy(l => l.Name).ToListAsync();
+
             _currentPositionLabel = _employee.JobPositionId.HasValue
                 ? _jobPositions.FirstOrDefault(j => j.Id == _employee.JobPositionId)?.Title ?? ""
                 : "";
@@ -830,16 +899,18 @@ else
     {
         _pe = new PersonalEdit
         {
-            NationalId = _employee!.NationalId,
-            TaxId = _employee.TaxId,
-            BirthDate = _employee.BirthDate,
-            MaritalStatus = _employee.MaritalStatus,
-            Nationality = _employee.Nationality,
-            AddressStreet = _employee.AddressStreet,
-            AddressCity = _employee.AddressCity,
-            AddressState = _employee.AddressState,
-            AddressPostalCode = _employee.AddressPostalCode,
-            AddressCountry = _employee.AddressCountry
+            NationalId      = _employee!.NationalId,
+            TaxId           = _employee.TaxId,
+            BirthDate       = _employee.BirthDate,
+            MaritalStatus   = _employee.MaritalStatus,
+            Nationality     = _employee.Nationality,
+            BirthCountryId  = _employee.BirthCountryId?.ToString()  ?? "",
+            BirthCityId     = _employee.BirthCityId?.ToString()     ?? "",
+            BirthLocalityId = _employee.BirthLocalityId?.ToString() ?? "",
+            AddressStreet    = _employee.AddressStreet,
+            AddressCountryId = _employee.CountryId?.ToString()   ?? "",
+            AddressCityId    = _employee.CityId?.ToString()      ?? "",
+            AddressLocalityId= _employee.LocalityId?.ToString()  ?? ""
         };
         _editingPersonal = true;
         _personalError = null;
@@ -850,22 +921,47 @@ else
         var emp = await DbContext.Employees.FindAsync(_employee!.Id);
         if (emp is null) return;
 
-        emp.NationalId = _pe.NationalId;
-        emp.TaxId = _pe.TaxId;
-        emp.BirthDate = _pe.BirthDate;
-        emp.MaritalStatus = _pe.MaritalStatus;
-        emp.Nationality = _pe.Nationality;
-        emp.AddressStreet = _pe.AddressStreet;
-        emp.AddressCity = _pe.AddressCity;
-        emp.AddressState = _pe.AddressState;
-        emp.AddressPostalCode = _pe.AddressPostalCode;
-        emp.AddressCountry = _pe.AddressCountry;
-        emp.UpdatedAt = DateTimeOffset.UtcNow;
+        emp.NationalId      = _pe.NationalId;
+        emp.TaxId           = _pe.TaxId;
+        emp.BirthDate       = _pe.BirthDate;
+        emp.MaritalStatus   = _pe.MaritalStatus;
+        emp.Nationality     = _pe.Nationality;
+        emp.BirthCountryId  = Guid.TryParse(_pe.BirthCountryId,  out var bc)  ? bc  : null;
+        emp.BirthCityId     = Guid.TryParse(_pe.BirthCityId,     out var bci) ? bci : null;
+        emp.BirthLocalityId = Guid.TryParse(_pe.BirthLocalityId, out var bl)  ? bl  : null;
+        emp.AddressStreet   = _pe.AddressStreet;
+        emp.CountryId       = Guid.TryParse(_pe.AddressCountryId,  out var ac)  ? ac  : null;
+        emp.CityId          = Guid.TryParse(_pe.AddressCityId,     out var aci) ? aci : null;
+        emp.LocalityId      = Guid.TryParse(_pe.AddressLocalityId, out var al)  ? al  : null;
+        emp.UpdatedAt       = DateTimeOffset.UtcNow;
 
         await DbContext.SaveChangesAsync();
         _editingPersonal = false;
         await LoadAll();
     }
+
+    private void ResetBirthCity()      { _pe.BirthCityId = "";     _pe.BirthLocalityId = ""; }
+    private void ResetBirthLocality()  { _pe.BirthLocalityId = ""; }
+    private void ResetAddressCity()    { _pe.AddressCityId = "";    _pe.AddressLocalityId = ""; }
+    private void ResetAddressLocality(){ _pe.AddressLocalityId = ""; }
+
+    private IEnumerable<City> BirthCitiesFiltered => string.IsNullOrEmpty(_pe.BirthCountryId)
+        ? _cities : _cities.Where(c => c.CountryId.ToString() == _pe.BirthCountryId);
+
+    private IEnumerable<Locality> BirthLocalitiesFiltered => string.IsNullOrEmpty(_pe.BirthCityId)
+        ? _localities : _localities.Where(l => l.CityId.ToString() == _pe.BirthCityId);
+
+    private IEnumerable<City> AddressCitiesFiltered => string.IsNullOrEmpty(_pe.AddressCountryId)
+        ? _cities : _cities.Where(c => c.CountryId.ToString() == _pe.AddressCountryId);
+
+    private IEnumerable<Locality> AddressLocalitiesFiltered => string.IsNullOrEmpty(_pe.AddressCityId)
+        ? _localities : _localities.Where(l => l.CityId.ToString() == _pe.AddressCityId);
+
+    private string? GetCountryName(Guid? id)  => id.HasValue ? _countries.FirstOrDefault(c => c.Id == id)?.Name     : null;
+    private string? GetCityName(Guid? id)     => id.HasValue ? _cities.FirstOrDefault(c => c.Id == id)?.Name        : null;
+    private string? GetStateName(Guid? id)    => id.HasValue ? _cities.FirstOrDefault(c => c.Id == id)?.StateName   : null;
+    private string? GetLocalityName(Guid? id) => id.HasValue ? _localities.FirstOrDefault(l => l.Id == id)?.Name    : null;
+    private string? GetPostalCode(Guid? id)   => id.HasValue ? _localities.FirstOrDefault(l => l.Id == id)?.PostalCode : null;
 
     // ── Position move ─────────────────────────────────────
     private async Task SavePosition()
@@ -1130,11 +1226,15 @@ else
         public DateOnly? BirthDate { get; set; }
         public MaritalStatus? MaritalStatus { get; set; }
         public string? Nationality { get; set; }
-        public string? AddressStreet { get; set; }
-        public string? AddressCity { get; set; }
-        public string? AddressState { get; set; }
-        public string? AddressPostalCode { get; set; }
-        public string? AddressCountry { get; set; }
+        // Lugar de nacimiento
+        public string BirthCountryId  { get; set; } = "";
+        public string BirthCityId     { get; set; } = "";
+        public string BirthLocalityId { get; set; } = "";
+        // Domicilio
+        public string? AddressStreet     { get; set; }
+        public string  AddressCountryId  { get; set; } = "";
+        public string  AddressCityId     { get; set; } = "";
+        public string  AddressLocalityId { get; set; } = "";
     }
 
     private sealed class PositionForm

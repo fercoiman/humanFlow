@@ -30,6 +30,16 @@ public sealed class Employee : AuditableEntity, ITenantScoped
     public string? AddressPostalCode { get; set; }
     public string? AddressCountry { get; set; }
 
+    // Domicilio — referencias a datos maestros de geografía
+    public Guid? CountryId { get; set; }
+    public Guid? CityId { get; set; }
+    public Guid? LocalityId { get; set; }
+
+    // Lugar de nacimiento — referencias a datos maestros de geografía
+    public Guid? BirthCountryId { get; set; }
+    public Guid? BirthCityId { get; set; }
+    public Guid? BirthLocalityId { get; set; }
+
     // Estado laboral
     public EmployeeStatus Status { get; set; } = EmployeeStatus.Draft;
     public DateOnly? HireDate { get; set; }

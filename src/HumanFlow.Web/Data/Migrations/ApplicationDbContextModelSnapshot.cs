@@ -28,6 +28,9 @@ namespace HumanFlow.Web.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("CountryId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -77,6 +80,8 @@ namespace HumanFlow.Web.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CountryId");
+
                     b.ToTable("Contacts");
                 });
 
@@ -106,8 +111,23 @@ namespace HumanFlow.Web.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
+                    b.Property<Guid?>("BirthCityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("BirthCountryId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateOnly?>("BirthDate")
                         .HasColumnType("date");
+
+                    b.Property<Guid?>("BirthLocalityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CountryId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -142,6 +162,9 @@ namespace HumanFlow.Web.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
+
+                    b.Property<Guid?>("LocalityId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("ManagerEmployeeId")
                         .HasColumnType("uniqueidentifier");
@@ -188,6 +211,18 @@ namespace HumanFlow.Web.Data.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BirthCityId");
+
+                    b.HasIndex("BirthCountryId");
+
+                    b.HasIndex("BirthLocalityId");
+
+                    b.HasIndex("CityId");
+
+                    b.HasIndex("CountryId");
+
+                    b.HasIndex("LocalityId");
 
                     b.HasIndex("TenantId", "EmployeeNumber")
                         .IsUnique();
@@ -534,6 +569,145 @@ namespace HumanFlow.Web.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("TerminationRecords");
+                });
+
+            modelBuilder.Entity("HumanFlow.Domain.Geography.City", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CountryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("StateName")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CountryId");
+
+                    b.HasIndex("TenantId", "CountryId", "Name");
+
+                    b.ToTable("Cities");
+                });
+
+            modelBuilder.Entity("HumanFlow.Domain.Geography.Country", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("IsoCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "IsoCode");
+
+                    b.ToTable("Countries");
+                });
+
+            modelBuilder.Entity("HumanFlow.Domain.Geography.Locality", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("PostalCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CityId");
+
+                    b.HasIndex("TenantId", "CityId", "Name");
+
+                    b.ToTable("Localities");
                 });
 
             modelBuilder.Entity("HumanFlow.Domain.Organization.JobPosition", b =>
@@ -1228,6 +1402,62 @@ namespace HumanFlow.Web.Data.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("HumanFlow.Domain.Contacts.Contact", b =>
+                {
+                    b.HasOne("HumanFlow.Domain.Geography.Country", null)
+                        .WithMany()
+                        .HasForeignKey("CountryId");
+                });
+
+            modelBuilder.Entity("HumanFlow.Domain.Employees.Employee", b =>
+                {
+                    b.HasOne("HumanFlow.Domain.Geography.City", null)
+                        .WithMany()
+                        .HasForeignKey("BirthCityId");
+
+                    b.HasOne("HumanFlow.Domain.Geography.Country", null)
+                        .WithMany()
+                        .HasForeignKey("BirthCountryId");
+
+                    b.HasOne("HumanFlow.Domain.Geography.Locality", null)
+                        .WithMany()
+                        .HasForeignKey("BirthLocalityId");
+
+                    b.HasOne("HumanFlow.Domain.Geography.City", null)
+                        .WithMany()
+                        .HasForeignKey("CityId");
+
+                    b.HasOne("HumanFlow.Domain.Geography.Country", null)
+                        .WithMany()
+                        .HasForeignKey("CountryId");
+
+                    b.HasOne("HumanFlow.Domain.Geography.Locality", null)
+                        .WithMany()
+                        .HasForeignKey("LocalityId");
+                });
+
+            modelBuilder.Entity("HumanFlow.Domain.Geography.City", b =>
+                {
+                    b.HasOne("HumanFlow.Domain.Geography.Country", "Country")
+                        .WithMany()
+                        .HasForeignKey("CountryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Country");
+                });
+
+            modelBuilder.Entity("HumanFlow.Domain.Geography.Locality", b =>
+                {
+                    b.HasOne("HumanFlow.Domain.Geography.City", "City")
+                        .WithMany()
+                        .HasForeignKey("CityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("City");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>

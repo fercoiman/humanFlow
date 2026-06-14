@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using HumanFlow.Domain.Contacts;
 using HumanFlow.Domain.Employees;
+using HumanFlow.Domain.Geography;
 using HumanFlow.Domain.Organization;
 using HumanFlow.Domain.Recruitment;
 using HumanFlow.Domain.Security;
@@ -28,6 +29,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<JobApplication> JobApplications => Set<JobApplication>();
     public DbSet<Interview> Interviews => Set<Interview>();
     public DbSet<Contact> Contacts => Set<Contact>();
+    public DbSet<Country> Countries => Set<Country>();
+    public DbSet<City> Cities => Set<City>();
+    public DbSet<Locality> Localities => Set<Locality>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -56,6 +60,33 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.Property(x => x.Description).HasMaxLength(500);
         });
 
+        builder.Entity<Country>(entity =>
+        {
+            entity.HasIndex(x => new { x.TenantId, x.IsoCode });
+            entity.Property(x => x.Name).HasMaxLength(150);
+            entity.Property(x => x.IsoCode).HasMaxLength(10);
+        });
+
+        builder.Entity<City>(entity =>
+        {
+            entity.HasIndex(x => new { x.TenantId, x.CountryId, x.Name });
+            entity.Property(x => x.Name).HasMaxLength(150);
+            entity.Property(x => x.StateName).HasMaxLength(150);
+            entity.HasOne(x => x.Country).WithMany()
+                  .HasForeignKey(x => x.CountryId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<Locality>(entity =>
+        {
+            entity.HasIndex(x => new { x.TenantId, x.CityId, x.Name });
+            entity.Property(x => x.Name).HasMaxLength(150);
+            entity.Property(x => x.PostalCode).HasMaxLength(20);
+            entity.HasOne(x => x.City).WithMany()
+                  .HasForeignKey(x => x.CityId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
         builder.Entity<Employee>(entity =>
         {
             entity.HasIndex(x => new { x.TenantId, x.EmployeeNumber }).IsUnique();
@@ -75,6 +106,18 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.Property(x => x.AddressCountry).HasMaxLength(100);
             entity.Ignore(x => x.FullName);
             entity.Ignore(x => x.Initials);
+            entity.HasOne<Country>().WithMany()
+                  .HasForeignKey(x => x.CountryId).IsRequired(false);
+            entity.HasOne<City>().WithMany()
+                  .HasForeignKey(x => x.CityId).IsRequired(false);
+            entity.HasOne<Locality>().WithMany()
+                  .HasForeignKey(x => x.LocalityId).IsRequired(false);
+            entity.HasOne<Country>().WithMany()
+                  .HasForeignKey(x => x.BirthCountryId).IsRequired(false);
+            entity.HasOne<City>().WithMany()
+                  .HasForeignKey(x => x.BirthCityId).IsRequired(false);
+            entity.HasOne<Locality>().WithMany()
+                  .HasForeignKey(x => x.BirthLocalityId).IsRequired(false);
         });
 
         builder.Entity<PositionHistory>(entity =>
@@ -105,6 +148,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.Property(x => x.OrganizationName).HasMaxLength(200);
             entity.Property(x => x.Email).HasMaxLength(255);
             entity.Property(x => x.Phone).HasMaxLength(80);
+            entity.HasOne<Country>().WithMany()
+                  .HasForeignKey(x => x.CountryId).IsRequired(false);
         });
 
         builder.Entity<PerformanceReview>(entity =>
