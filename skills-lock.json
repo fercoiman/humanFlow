@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "project-structure": {
+      "source": "wshaddix/dotnet-skills",
+      "sourceType": "github",
+      "skillPath": "skills/project-structure/SKILL.md",
+      "computedHash": "3e916f871b42c4a77a6029fc7a6bf0e5ac49090828cae2a0a041c6c41c8d7c7c"
+    }
+  }
+}

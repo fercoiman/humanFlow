@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "humanflow-web",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/HumanFlow.Web/HumanFlow.Web.csproj", "--launch-profile", "https"],
+      "port": 5000,
+      "autoPort": false
+    }
+  ]
+}
