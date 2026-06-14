@@ -4,54 +4,71 @@
 @using Microsoft.EntityFrameworkCore
 @inject ApplicationDbContext DbContext
 
-<PageTitle>Roles y permisos</PageTitle>
+<PageTitle>Roles y permisos — HumanFlow</PageTitle>
 
-<h1>Roles y permisos</h1>
-<p class="text-muted">Roles base por tenant y catalogo de permisos granulares preparados para crecer.</p>
-
-<div class="row g-3 mb-4">
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header">Roles del tenant demo</div>
-            <div class="card-body">
-                @if (_roles is null)
-                {
-                    <p>Cargando...</p>
-                }
-                else
-                {
-                    <ul class="list-group list-group-flush">
-                        @foreach (var role in _roles)
-                        {
-                            <li class="list-group-item">
-                                <strong>@role.Name</strong>
-                                <div class="text-muted">@role.Description</div>
-                            </li>
-                        }
-                    </ul>
-                }
-            </div>
-        </div>
+<div class="hf-page-header">
+    <div>
+        <h1>Roles y permisos</h1>
+        <p class="hf-page-subtitle">Roles base por tenant y catálogo de permisos granulares preparados para crecer.</p>
     </div>
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header">Permisos disponibles</div>
-            <div class="card-body">
-                @if (_permissions is null)
-                {
-                    <p>Cargando...</p>
-                }
-                else
-                {
-                    <div class="d-flex flex-wrap gap-2">
-                        @foreach (var permission in _permissions)
-                        {
-                            <span class="badge text-bg-light border">@permission.Key</span>
-                        }
-                    </div>
-                }
-            </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+    <div class="hf-section">
+        <div class="hf-section-header">
+            <h2 class="hf-section-title">Roles del tenant demo</h2>
+            @if (_roles is not null)
+            {
+                <span class="hf-badge hf-badge-primary">@_roles.Count roles</span>
+            }
         </div>
+        @if (_roles is null)
+        {
+            <div class="hf-loading">
+                <div class="hf-loading-spinner"></div>
+                Cargando&hellip;
+            </div>
+        }
+        else
+        {
+            <ul class="hf-role-list">
+                @foreach (var role in _roles)
+                {
+                    <li class="hf-role-item">
+                        <div class="hf-role-name">@role.Name</div>
+                        <div class="hf-role-desc">@role.Description</div>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+
+    <div class="hf-section">
+        <div class="hf-section-header">
+            <h2 class="hf-section-title">Permisos disponibles</h2>
+            @if (_permissions is not null)
+            {
+                <span class="hf-badge hf-badge-neutral">@_permissions.Count permisos</span>
+            }
+        </div>
+        @if (_permissions is null)
+        {
+            <div class="hf-loading">
+                <div class="hf-loading-spinner"></div>
+                Cargando&hellip;
+            </div>
+        }
+        else
+        {
+            <div class="hf-section-body">
+                <div class="hf-perm-grid">
+                    @foreach (var permission in _permissions)
+                    {
+                        <span class="hf-perm-tag">@permission.Key</span>
+                    }
+                </div>
+            </div>
+        }
     </div>
 </div>
 

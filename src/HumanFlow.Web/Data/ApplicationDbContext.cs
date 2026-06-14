@@ -18,6 +18,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<EmployeeDocument> EmployeeDocuments => Set<EmployeeDocument>();
     public DbSet<EmployeeEvent> EmployeeEvents => Set<EmployeeEvent>();
+    public DbSet<PositionHistory> PositionHistories => Set<PositionHistory>();
+    public DbSet<EmployeeContact> EmployeeContacts => Set<EmployeeContact>();
+    public DbSet<TerminationRecord> TerminationRecords => Set<TerminationRecord>();
     public DbSet<Contact> Contacts => Set<Contact>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -54,7 +57,40 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.Property(x => x.FirstName).HasMaxLength(150);
             entity.Property(x => x.LastName).HasMaxLength(150);
             entity.Property(x => x.Email).HasMaxLength(255);
+            entity.Property(x => x.PersonalEmail).HasMaxLength(255);
+            entity.Property(x => x.Phone).HasMaxLength(80);
+            entity.Property(x => x.NationalId).HasMaxLength(50);
+            entity.Property(x => x.TaxId).HasMaxLength(50);
+            entity.Property(x => x.Nationality).HasMaxLength(100);
+            entity.Property(x => x.AddressStreet).HasMaxLength(300);
+            entity.Property(x => x.AddressCity).HasMaxLength(150);
+            entity.Property(x => x.AddressState).HasMaxLength(150);
+            entity.Property(x => x.AddressPostalCode).HasMaxLength(20);
+            entity.Property(x => x.AddressCountry).HasMaxLength(100);
             entity.Ignore(x => x.FullName);
+            entity.Ignore(x => x.Initials);
+        });
+
+        builder.Entity<PositionHistory>(entity =>
+        {
+            entity.HasIndex(x => new { x.TenantId, x.EmployeeId });
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+        });
+
+        builder.Entity<EmployeeContact>(entity =>
+        {
+            entity.HasIndex(x => new { x.TenantId, x.EmployeeId });
+            entity.Property(x => x.FullName).HasMaxLength(200);
+            entity.Property(x => x.Phone).HasMaxLength(80);
+            entity.Property(x => x.Email).HasMaxLength(255);
+            entity.Property(x => x.Notes).HasMaxLength(500);
+        });
+
+        builder.Entity<TerminationRecord>(entity =>
+        {
+            entity.HasIndex(x => x.EmployeeId).IsUnique();
+            entity.Property(x => x.Reason).HasMaxLength(1000);
+            entity.Property(x => x.ExitInterviewNotes).HasMaxLength(2000);
         });
 
         builder.Entity<Contact>(entity =>

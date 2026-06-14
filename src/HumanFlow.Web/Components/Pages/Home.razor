@@ -1,70 +1,70 @@
-﻿@page "/"
+@page "/"
 @using HumanFlow.Web.Data
 @using Microsoft.EntityFrameworkCore
 @inject ApplicationDbContext DbContext
 
-<PageTitle>HumanFlow</PageTitle>
+<PageTitle>HumanFlow — Dashboard</PageTitle>
 
-<div class="mb-4">
-    <h1>HumanFlow</h1>
-    <p class="lead">MVP fundacional para administrar tenants, seguridad, legajos, contactos y datos maestros de RRHH.</p>
-</div>
-
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <div class="text-muted small">Tenants</div>
-                <div class="display-6">@_tenantCount</div>
-                <a href="admin/tenants">Administrar tenants</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <div class="text-muted small">Legajos</div>
-                <div class="display-6">@_employeeCount</div>
-                <a href="employees">Ver empleados</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <div class="text-muted small">Contactos</div>
-                <div class="display-6">@_contactCount</div>
-                <a href="contacts">Ver contactos</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <div class="text-muted small">Roles</div>
-                <div class="display-6">@_roleCount</div>
-                <a href="admin/roles">Ver roles</a>
-            </div>
-        </div>
+<div class="hf-page-header">
+    <div>
+        <h1>Dashboard</h1>
+        <p class="hf-page-subtitle">MVP fundacional para administrar tenants, seguridad, legajos, contactos y datos maestros de RRHH.</p>
     </div>
 </div>
 
-<section class="mb-4">
-    <h2 class="h4">Alcance visible del MVP</h2>
-    <ul>
-        <li>Modelo multi-tenant hibrido con tenants compartidos y dedicados.</li>
-        <li>Legajo fundacional de empleados con estado laboral y datos principales.</li>
-        <li>Contactos internos y externos reutilizables.</li>
-        <li>Roles base, permisos granulares y usuario administrador demo.</li>
-        <li>Datos maestros iniciales de areas y puestos.</li>
-    </ul>
-</section>
+<div class="hf-kpi-grid">
+    <a class="hf-kpi-card hf-kpi-accent-blue" href="admin/tenants">
+        <div class="hf-kpi-label">Tenants</div>
+        <div class="hf-kpi-value">@_tenantCount</div>
+        <div class="hf-kpi-action">Administrar tenants</div>
+    </a>
+    <a class="hf-kpi-card hf-kpi-accent-green" href="employees">
+        <div class="hf-kpi-label">Legajos</div>
+        <div class="hf-kpi-value">@_employeeCount</div>
+        <div class="hf-kpi-action">Ver empleados</div>
+    </a>
+    <a class="hf-kpi-card hf-kpi-accent-sky" href="contacts">
+        <div class="hf-kpi-label">Contactos</div>
+        <div class="hf-kpi-value">@_contactCount</div>
+        <div class="hf-kpi-action">Ver contactos</div>
+    </a>
+    <a class="hf-kpi-card hf-kpi-accent-amber" href="admin/roles">
+        <div class="hf-kpi-label">Roles</div>
+        <div class="hf-kpi-value">@_roleCount</div>
+        <div class="hf-kpi-action">Ver roles</div>
+    </a>
+</div>
 
-<section>
-    <h2 class="h4">Acceso demo</h2>
-    <p><strong>Usuario:</strong> admin@humanflow.local</p>
-    <p><strong>Password:</strong> HumanFlow123!</p>
-</section>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+    <div class="hf-section">
+        <div class="hf-section-header">
+            <h2 class="hf-section-title">Alcance visible del MVP</h2>
+        </div>
+        <div class="hf-section-body">
+            <ul class="hf-info-list">
+                <li>Modelo multi-tenant híbrido con tenants compartidos y dedicados.</li>
+                <li>Legajo fundacional de empleados con estado laboral y datos principales.</li>
+                <li>Contactos internos y externos reutilizables.</li>
+                <li>Roles base, permisos granulares y usuario administrador demo.</li>
+                <li>Datos maestros iniciales de áreas y puestos.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="hf-section">
+        <div class="hf-section-header">
+            <h2 class="hf-section-title">Acceso demo</h2>
+        </div>
+        <div class="hf-section-body">
+            <dl class="hf-demo-cred">
+                <dt>Usuario</dt>
+                <dd>admin@humanflow.local</dd>
+                <dt>Contraseña</dt>
+                <dd>HumanFlow123!</dd>
+            </dl>
+        </div>
+    </div>
+</div>
 
 @code {
     private int _tenantCount;

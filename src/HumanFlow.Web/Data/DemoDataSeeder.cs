@@ -31,8 +31,9 @@ public static class DemoDataSeeder
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
-        await db.Database.EnsureCreatedAsync();
+        await db.Database.MigrateAsync();
 
+        // ── Tenants ──────────────────────────────────────────────
         var demoTenant = await db.Tenants.FirstOrDefaultAsync(x => x.Slug == "demo");
         if (demoTenant is null)
         {
@@ -48,8 +49,7 @@ public static class DemoDataSeeder
             await db.SaveChangesAsync();
         }
 
-        var regulatedTenant = await db.Tenants.FirstOrDefaultAsync(x => x.Slug == "regulated");
-        if (regulatedTenant is null)
+        if (!await db.Tenants.AnyAsync(x => x.Slug == "regulated"))
         {
             db.Tenants.Add(new Tenant
             {
@@ -61,6 +61,7 @@ public static class DemoDataSeeder
             });
         }
 
+        // ── Permisos ──────────────────────────────────────────────
         foreach (var permissionKey in PermissionKeys)
         {
             if (!await db.PermissionDefinitions.AnyAsync(x => x.Key == permissionKey))
@@ -74,6 +75,7 @@ public static class DemoDataSeeder
             }
         }
 
+        // ── Roles ─────────────────────────────────────────────────
         if (!await db.HumanFlowRoles.AnyAsync(x => x.TenantId == demoTenant.Id))
         {
             db.HumanFlowRoles.AddRange(
@@ -100,6 +102,7 @@ public static class DemoDataSeeder
                 });
         }
 
+        // ── Áreas y Puestos ───────────────────────────────────────
         if (!await db.OrganizationUnits.AnyAsync(x => x.TenantId == demoTenant.Id))
         {
             db.OrganizationUnits.AddRange(
@@ -116,6 +119,7 @@ public static class DemoDataSeeder
                 new JobPosition { TenantId = demoTenant.Id, Title = "Coordinador de Operaciones", Code = "OPS-CO" });
         }
 
+        // ── Contactos institucionales ─────────────────────────────
         if (!await db.Contacts.AnyAsync(x => x.TenantId == demoTenant.Id))
         {
             db.Contacts.AddRange(
@@ -149,6 +153,7 @@ public static class DemoDataSeeder
                 });
         }
 
+        // ── Empleados ─────────────────────────────────────────────
         if (!await db.Employees.AnyAsync(x => x.TenantId == demoTenant.Id))
         {
             db.Employees.AddRange(
@@ -156,10 +161,21 @@ public static class DemoDataSeeder
                 {
                     TenantId = demoTenant.Id,
                     EmployeeNumber = "EMP-001",
-                    FirstName = "Maria",
-                    LastName = "Gomez",
+                    FirstName = "María",
+                    LastName = "Gómez",
                     Email = "maria.gomez@demo.local",
+                    PersonalEmail = "maria.gomez@gmail.com",
                     Phone = "+54 11 5000-0001",
+                    NationalId = "28.456.789",
+                    TaxId = "27-28456789-4",
+                    BirthDate = new DateOnly(1988, 6, 12),
+                    MaritalStatus = MaritalStatus.Married,
+                    Nationality = "Argentina",
+                    AddressStreet = "Av. Corrientes 1234 Piso 3",
+                    AddressCity = "Buenos Aires",
+                    AddressState = "CABA",
+                    AddressPostalCode = "C1043",
+                    AddressCountry = "Argentina",
                     Status = EmployeeStatus.Active,
                     HireDate = new DateOnly(2022, 3, 14)
                 },
@@ -167,10 +183,18 @@ public static class DemoDataSeeder
                 {
                     TenantId = demoTenant.Id,
                     EmployeeNumber = "EMP-002",
-                    FirstName = "Lucia",
-                    LastName = "Perez",
+                    FirstName = "Lucía",
+                    LastName = "Pérez",
                     Email = "lucia.perez@demo.local",
                     Phone = "+54 11 5000-0002",
+                    NationalId = "32.100.200",
+                    TaxId = "23-32100200-9",
+                    BirthDate = new DateOnly(1993, 11, 3),
+                    MaritalStatus = MaritalStatus.Single,
+                    Nationality = "Argentina",
+                    AddressCity = "Rosario",
+                    AddressState = "Santa Fe",
+                    AddressCountry = "Argentina",
                     Status = EmployeeStatus.OnLeave,
                     HireDate = new DateOnly(2021, 9, 1)
                 },
@@ -178,15 +202,153 @@ public static class DemoDataSeeder
                 {
                     TenantId = demoTenant.Id,
                     EmployeeNumber = "EMP-003",
-                    FirstName = "Tomas",
+                    FirstName = "Tomás",
                     LastName = "Rivas",
                     Email = "tomas.rivas@demo.local",
+                    PersonalEmail = "trivas@hotmail.com",
                     Phone = "+54 11 5000-0003",
+                    NationalId = "35.678.901",
+                    TaxId = "20-35678901-3",
+                    BirthDate = new DateOnly(1996, 4, 25),
+                    MaritalStatus = MaritalStatus.Single,
+                    Nationality = "Argentina",
+                    AddressStreet = "San Martín 456",
+                    AddressCity = "Córdoba",
+                    AddressState = "Córdoba",
+                    AddressPostalCode = "X5000",
+                    AddressCountry = "Argentina",
                     Status = EmployeeStatus.Active,
                     HireDate = new DateOnly(2023, 1, 23)
                 });
+
+            await db.SaveChangesAsync();
         }
 
+        // ── Historial de puestos y contactos de emergencia ────────
+        var emp1 = await db.Employees.FirstOrDefaultAsync(e => e.EmployeeNumber == "EMP-001" && e.TenantId == demoTenant.Id);
+        var emp2 = await db.Employees.FirstOrDefaultAsync(e => e.EmployeeNumber == "EMP-002" && e.TenantId == demoTenant.Id);
+        var emp3 = await db.Employees.FirstOrDefaultAsync(e => e.EmployeeNumber == "EMP-003" && e.TenantId == demoTenant.Id);
+
+        var posHR = await db.JobPositions.FirstOrDefaultAsync(j => j.TenantId == demoTenant.Id && j.Code == "HR-AN");
+        var posIT = await db.JobPositions.FirstOrDefaultAsync(j => j.TenantId == demoTenant.Id && j.Code == "IT-LT");
+        var posOPS = await db.JobPositions.FirstOrDefaultAsync(j => j.TenantId == demoTenant.Id && j.Code == "OPS-CO");
+        var unitHR = await db.OrganizationUnits.FirstOrDefaultAsync(u => u.TenantId == demoTenant.Id && u.Code == "HR");
+        var unitIT = await db.OrganizationUnits.FirstOrDefaultAsync(u => u.TenantId == demoTenant.Id && u.Code == "IT");
+        var unitOPS = await db.OrganizationUnits.FirstOrDefaultAsync(u => u.TenantId == demoTenant.Id && u.Code == "OPS");
+
+        if (emp1 is not null && posHR is not null && posIT is not null && unitHR is not null && unitIT is not null
+            && !await db.PositionHistories.AnyAsync(p => p.EmployeeId == emp1.Id))
+        {
+            // María: ingreso como Analista HR, luego promovida a Líder Técnico
+            db.PositionHistories.AddRange(
+                new PositionHistory
+                {
+                    TenantId = demoTenant.Id,
+                    EmployeeId = emp1.Id,
+                    JobPositionId = posHR.Id,
+                    OrganizationUnitId = unitHR.Id,
+                    StartDate = new DateOnly(2022, 3, 14),
+                    EndDate = new DateOnly(2023, 1, 15),
+                    Reason = PositionChangeReason.Hire,
+                    Notes = "Ingreso como analista junior."
+                },
+                new PositionHistory
+                {
+                    TenantId = demoTenant.Id,
+                    EmployeeId = emp1.Id,
+                    JobPositionId = posIT.Id,
+                    OrganizationUnitId = unitIT.Id,
+                    StartDate = new DateOnly(2023, 1, 16),
+                    EndDate = null,
+                    Reason = PositionChangeReason.Promotion,
+                    Notes = "Promoción por desempeño destacado."
+                });
+
+            // Actualizar puesto actual en Employee
+            emp1.JobPositionId = posIT.Id;
+            emp1.OrganizationUnitId = unitIT.Id;
+        }
+
+        if (emp2 is not null && posOPS is not null && unitOPS is not null
+            && !await db.PositionHistories.AnyAsync(p => p.EmployeeId == emp2.Id))
+        {
+            db.PositionHistories.Add(new PositionHistory
+            {
+                TenantId = demoTenant.Id,
+                EmployeeId = emp2.Id,
+                JobPositionId = posOPS.Id,
+                OrganizationUnitId = unitOPS.Id,
+                StartDate = new DateOnly(2021, 9, 1),
+                EndDate = null,
+                Reason = PositionChangeReason.Hire
+            });
+
+            emp2.JobPositionId = posOPS.Id;
+            emp2.OrganizationUnitId = unitOPS.Id;
+        }
+
+        if (emp3 is not null && posHR is not null && unitHR is not null && emp1 is not null
+            && !await db.PositionHistories.AnyAsync(p => p.EmployeeId == emp3.Id))
+        {
+            db.PositionHistories.Add(new PositionHistory
+            {
+                TenantId = demoTenant.Id,
+                EmployeeId = emp3.Id,
+                JobPositionId = posHR.Id,
+                OrganizationUnitId = unitHR.Id,
+                ManagerEmployeeId = emp1.Id,
+                StartDate = new DateOnly(2023, 1, 23),
+                EndDate = null,
+                Reason = PositionChangeReason.Hire
+            });
+
+            emp3.JobPositionId = posHR.Id;
+            emp3.OrganizationUnitId = unitHR.Id;
+            emp3.ManagerEmployeeId = emp1.Id;
+        }
+
+        // Contactos de emergencia
+        if (emp1 is not null && !await db.EmployeeContacts.AnyAsync(c => c.EmployeeId == emp1.Id))
+        {
+            db.EmployeeContacts.AddRange(
+                new EmployeeContact
+                {
+                    TenantId = demoTenant.Id,
+                    EmployeeId = emp1.Id,
+                    FullName = "Carlos Gómez",
+                    Relationship = ContactRelationship.Father,
+                    Phone = "+54 11 5000-9001",
+                    IsEmergencyContact = true,
+                    IsPrimaryEmergencyContact = true
+                },
+                new EmployeeContact
+                {
+                    TenantId = demoTenant.Id,
+                    EmployeeId = emp1.Id,
+                    FullName = "Roberto García",
+                    Relationship = ContactRelationship.Spouse,
+                    Phone = "+54 11 5000-9002",
+                    Email = "roberto.garcia@gmail.com",
+                    IsEmergencyContact = true,
+                    IsPrimaryEmergencyContact = false
+                });
+        }
+
+        if (emp3 is not null && !await db.EmployeeContacts.AnyAsync(c => c.EmployeeId == emp3.Id))
+        {
+            db.EmployeeContacts.Add(new EmployeeContact
+            {
+                TenantId = demoTenant.Id,
+                EmployeeId = emp3.Id,
+                FullName = "Ana Rivas",
+                Relationship = ContactRelationship.Mother,
+                Phone = "+54 11 5000-9003",
+                IsEmergencyContact = true,
+                IsPrimaryEmergencyContact = true
+            });
+        }
+
+        // ── Usuario admin ─────────────────────────────────────────
         var admin = await userManager.FindByEmailAsync("admin@humanflow.local");
         if (admin is null)
         {

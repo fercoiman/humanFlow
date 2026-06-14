@@ -4,47 +4,54 @@
 @using Microsoft.EntityFrameworkCore
 @inject ApplicationDbContext DbContext
 
-<PageTitle>Contactos</PageTitle>
+<PageTitle>Contactos — HumanFlow</PageTitle>
 
-<div class="d-flex align-items-center justify-content-between mb-3">
+<div class="hf-page-header">
     <div>
         <h1>Contactos</h1>
-        <p class="text-muted mb-0">Contactos internos y externos reutilizables por RRHH.</p>
+        <p class="hf-page-subtitle">Contactos internos y externos reutilizables por RRHH.</p>
     </div>
-    <span class="badge text-bg-primary">@(_contacts?.Count ?? 0) contactos</span>
+    <span class="hf-badge hf-badge-primary">@(_contacts?.Count ?? 0) contactos</span>
 </div>
 
 @if (_contacts is null)
 {
-    <p>Cargando...</p>
+    <div class="hf-loading">
+        <div class="hf-loading-spinner"></div>
+        Cargando contactos&hellip;
+    </div>
 }
 else
 {
-    <table class="table table-hover align-middle">
-        <thead>
-            <tr>
-                <th>Nombre</th>
-                <th>Clase</th>
-                <th>Tipo</th>
-                <th>Organizacion</th>
-                <th>Email</th>
-                <th>Telefono</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var contact in _contacts)
-            {
+    <div class="hf-table-wrapper">
+        <table class="hf-table">
+            <thead>
                 <tr>
-                    <td>@contact.DisplayName</td>
-                    <td>@contact.Kind</td>
-                    <td>@contact.Type</td>
-                    <td>@contact.OrganizationName</td>
-                    <td>@contact.Email</td>
-                    <td>@contact.Phone</td>
+                    <th>Nombre</th>
+                    <th>Clase</th>
+                    <th>Tipo</th>
+                    <th>Organización</th>
+                    <th>Email</th>
+                    <th>Teléfono</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var contact in _contacts)
+                {
+                    <tr>
+                        <td style="font-weight:600">@contact.DisplayName</td>
+                        <td>
+                            <span class="@KindClass(contact.Kind)">@contact.Kind</span>
+                        </td>
+                        <td style="color:var(--color-foreground-muted)">@contact.Type</td>
+                        <td style="color:var(--color-foreground-muted)">@contact.OrganizationName</td>
+                        <td style="color:var(--color-foreground-muted)">@contact.Email</td>
+                        <td style="color:var(--color-foreground-muted)">@contact.Phone</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 @code {
@@ -57,4 +64,12 @@ else
             .ThenBy(x => x.DisplayName)
             .ToListAsync();
     }
+
+    private static string KindClass(ContactKind kind) =>
+        kind switch
+        {
+            ContactKind.Internal => "hf-badge hf-badge-primary",
+            ContactKind.External => "hf-badge hf-badge-neutral",
+            _                   => "hf-badge hf-badge-neutral"
+        };
 }

@@ -1,0 +1,902 @@
+@page "/employees/{Id:guid}"
+@rendermode InteractiveServer
+@using HumanFlow.Domain.Employees
+@using HumanFlow.Domain.Organization
+@using HumanFlow.Web.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject NavigationManager Nav
+
+<PageTitle>@(_employee?.FullName ?? "Legajo") — HumanFlow</PageTitle>
+
+@if (_loading)
+{
+    <div class="hf-loading"><div class="hf-loading-spinner"></div>Cargando legajo&hellip;</div>
+}
+else if (_employee is null)
+{
+    <div class="hf-page-header">
+        <div><h1>Legajo no encontrado</h1></div>
+    </div>
+    <a href="employees" class="hf-badge hf-badge-primary">← Volver a legajos</a>
+}
+else
+{
+    <!-- ── Header ─────────────────────────────────────────── -->
+    <div style="margin-bottom:.75rem">
+        <a href="employees" style="font-size:.8125rem;color:var(--color-foreground-muted);text-decoration:none">
+            ← Legajos
+        </a>
+    </div>
+
+    <div class="hf-employee-header">
+        <div class="hf-employee-avatar">@_employee.Initials</div>
+        <div class="hf-employee-header-info">
+            <h1>@_employee.FullName</h1>
+            <div class="hf-employee-meta">
+                <span><span class="hf-table-code">@_employee.EmployeeNumber</span></span>
+                @if (_employee.HireDate.HasValue)
+                {
+                    <span>Ingreso: @_employee.HireDate.Value.ToString("dd/MM/yyyy")</span>
+                }
+                @if (!string.IsNullOrEmpty(_currentPositionLabel))
+                {
+                    <span>@_currentPositionLabel</span>
+                }
+                @if (!string.IsNullOrEmpty(_currentUnitLabel))
+                {
+                    <span>@_currentUnitLabel</span>
+                }
+            </div>
+        </div>
+        <span class="@StatusClass(_employee.Status)">@StatusLabel(_employee.Status)</span>
+    </div>
+
+    <!-- ── Tabs ───────────────────────────────────────────── -->
+    <div class="hf-tabs">
+        <button class="hf-tab @(Tab == "personal" ? "active" : "")" @onclick='() => SetTab("personal")'>Datos personales</button>
+        <button class="hf-tab @(Tab == "puestos" ? "active" : "")" @onclick='() => SetTab("puestos")'>
+            Historial de puestos
+            @if (_positions.Count > 0) { <span>&nbsp;(@_positions.Count)</span> }
+        </button>
+        <button class="hf-tab @(Tab == "contactos" ? "active" : "")" @onclick='() => SetTab("contactos")'>
+            Contactos
+            @if (_contacts.Count > 0) { <span>&nbsp;(@_contacts.Count)</span> }
+        </button>
+        <button class="hf-tab @(Tab == "salida" ? "active" : "")" @onclick='() => SetTab("salida")'>Desvinculación</button>
+    </div>
+
+    <!-- ══ TAB: DATOS PERSONALES ═══════════════════════════ -->
+    @if (Tab == "personal")
+    {
+        <div class="hf-section">
+            <div class="hf-section-header">
+                <h2 class="hf-section-title">Datos personales</h2>
+                @if (!_editingPersonal)
+                {
+                    <button class="btn-hf-secondary" @onclick="StartEditPersonal">Editar</button>
+                }
+            </div>
+
+            @if (!_editingPersonal)
+            {
+                <div class="hf-field-grid">
+                    <div class="hf-section-divider">Contacto corporativo</div>
+                    <FieldView Label="Email corporativo" Value="@_employee.Email" />
+                    <FieldView Label="Email personal" Value="@_employee.PersonalEmail" />
+                    <FieldView Label="Teléfono" Value="@_employee.Phone" />
+
+                    <div class="hf-section-divider">Identificación</div>
+                    <FieldView Label="DNI" Value="@_employee.NationalId" />
+                    <FieldView Label="CUIL / CUIT" Value="@_employee.TaxId" />
+                    <FieldView Label="Fecha de nacimiento" Value="@_employee.BirthDate?.ToString("dd/MM/yyyy")" />
+                    <FieldView Label="Estado civil" Value="@MaritalStatusLabel(_employee.MaritalStatus)" />
+                    <FieldView Label="Nacionalidad" Value="@_employee.Nationality" />
+
+                    <div class="hf-section-divider">Domicilio</div>
+                    <FieldView Label="Calle" Value="@_employee.AddressStreet" />
+                    <FieldView Label="Ciudad" Value="@_employee.AddressCity" />
+                    <FieldView Label="Provincia / Estado" Value="@_employee.AddressState" />
+                    <FieldView Label="Código postal" Value="@_employee.AddressPostalCode" />
+                    <FieldView Label="País" Value="@_employee.AddressCountry" />
+                </div>
+            }
+            else
+            {
+                <div class="hf-add-form" style="margin:1.25rem">
+                    <p class="hf-add-form-title">Editar datos personales</p>
+                    <div class="hf-form-grid">
+                        <div class="hf-section-divider">Identificación</div>
+                        <div>
+                            <label class="hf-field-label form-label">DNI</label>
+                            <input class="form-control form-control-sm" @bind="_pe.NationalId" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">CUIL / CUIT</label>
+                            <input class="form-control form-control-sm" @bind="_pe.TaxId" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Fecha de nacimiento</label>
+                            <InputDate TValue="DateOnly?" @bind-Value="_pe.BirthDate" class="form-control form-control-sm" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Estado civil</label>
+                            <InputSelect TValue="MaritalStatus?" @bind-Value="_pe.MaritalStatus" class="form-select form-select-sm">
+                                <option value="">— Sin datos —</option>
+                                @foreach (var ms in Enum.GetValues<MaritalStatus>().Where(m => m != MaritalStatus.Unknown))
+                                {
+                                    <option value="@ms">@MaritalStatusLabel(ms)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Nacionalidad</label>
+                            <input class="form-control form-control-sm" @bind="_pe.Nationality" />
+                        </div>
+
+                        <div class="hf-section-divider">Domicilio</div>
+                        <div class="hf-form-grid-full">
+                            <label class="hf-field-label form-label">Calle / Dirección</label>
+                            <input class="form-control form-control-sm" @bind="_pe.AddressStreet" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Ciudad</label>
+                            <input class="form-control form-control-sm" @bind="_pe.AddressCity" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Provincia / Estado</label>
+                            <input class="form-control form-control-sm" @bind="_pe.AddressState" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Código postal</label>
+                            <input class="form-control form-control-sm" @bind="_pe.AddressPostalCode" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">País</label>
+                            <input class="form-control form-control-sm" @bind="_pe.AddressCountry" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(_personalError))
+                        {
+                            <div class="hf-alert-error">@_personalError</div>
+                        }
+                    </div>
+                    <div class="hf-form-actions">
+                        <button class="btn btn-primary btn-sm" @onclick="SavePersonal">Guardar cambios</button>
+                        <button class="btn-hf-secondary" @onclick="() => _editingPersonal = false">Cancelar</button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- ══ TAB: HISTORIAL DE PUESTOS ══════════════════════ -->
+    @if (Tab == "puestos")
+    {
+        <div class="hf-section">
+            <div class="hf-section-header">
+                <h2 class="hf-section-title">Historial de puestos</h2>
+                @if (!_showPosForm)
+                {
+                    <button class="btn btn-primary btn-sm" @onclick="() => _showPosForm = true">+ Registrar movimiento</button>
+                }
+            </div>
+
+            @if (_positions.Count == 0 && !_showPosForm)
+            {
+                <div class="hf-section-body" style="color:var(--color-foreground-muted);font-size:.875rem">
+                    Sin historial de puestos registrado.
+                </div>
+            }
+            else
+            {
+                @foreach (var pos in _positions.OrderByDescending(p => p.StartDate))
+                {
+                    var isCurrent = pos.EndDate is null;
+                    <div class="hf-timeline-item">
+                        <div class="hf-timeline-marker">
+                            <div class="hf-timeline-dot @(isCurrent ? "current" : "")"></div>
+                        </div>
+                        <div class="hf-timeline-body">
+                            <div class="hf-timeline-title">
+                                @GetPositionTitle(pos.JobPositionId)
+                                @if (isCurrent) { <span class="hf-badge hf-badge-success" style="margin-left:.5rem;font-size:.625rem">Actual</span> }
+                            </div>
+                            <div class="hf-timeline-sub">
+                                @GetUnitName(pos.OrganizationUnitId)
+                                @if (pos.ManagerEmployeeId.HasValue)
+                                {
+                                    <span> · Jefe: @GetEmployeeName(pos.ManagerEmployeeId)</span>
+                                }
+                            </div>
+                            <div class="hf-timeline-dates">
+                                @pos.StartDate.ToString("dd/MM/yyyy") —
+                                @(pos.EndDate.HasValue ? pos.EndDate.Value.ToString("dd/MM/yyyy") : "Presente")
+                                · <span class="hf-badge hf-badge-neutral" style="font-size:.625rem">@ReasonLabel(pos.Reason)</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(pos.Notes))
+                            {
+                                <div style="font-size:.8125rem;color:var(--color-foreground-muted);margin-top:.25rem;font-style:italic">
+                                    @pos.Notes
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+
+            @if (_showPosForm)
+            {
+                <div class="hf-add-form">
+                    <p class="hf-add-form-title">Registrar movimiento de puesto</p>
+                    <div class="hf-form-grid">
+                        <div>
+                            <label class="hf-field-label form-label">Puesto</label>
+                            <select class="form-select form-select-sm" @bind="_pf.JobPositionId">
+                                <option value="">— Sin puesto —</option>
+                                @foreach (var jp in _jobPositions)
+                                {
+                                    <option value="@jp.Id">@jp.Title</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Área</label>
+                            <select class="form-select form-select-sm" @bind="_pf.OrganizationUnitId">
+                                <option value="">— Sin área —</option>
+                                @foreach (var ou in _orgUnits)
+                                {
+                                    <option value="@ou.Id">@ou.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Jefe directo</label>
+                            <select class="form-select form-select-sm" @bind="_pf.ManagerEmployeeId">
+                                <option value="">— Sin jefe —</option>
+                                @foreach (var emp in _allEmployees.Where(e => e.Id != _employee.Id))
+                                {
+                                    <option value="@emp.Id">@emp.FullName</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Fecha de inicio <span style="color:var(--color-destructive)">*</span></label>
+                            <InputDate TValue="DateOnly" @bind-Value="_pf.StartDate" class="form-control form-control-sm" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Motivo</label>
+                            <InputSelect TValue="PositionChangeReason" @bind-Value="_pf.Reason" class="form-select form-select-sm">
+                                @foreach (var r in Enum.GetValues<PositionChangeReason>())
+                                {
+                                    <option value="@r">@ReasonLabel(r)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="hf-form-grid-full">
+                            <label class="hf-field-label form-label">Notas</label>
+                            <textarea class="form-control form-control-sm" rows="2" @bind="_pf.Notes"></textarea>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_posError))
+                        {
+                            <div class="hf-alert-error">@_posError</div>
+                        }
+                    </div>
+                    <div class="hf-form-actions">
+                        <button class="btn btn-primary btn-sm" @onclick="SavePosition">Guardar movimiento</button>
+                        <button class="btn-hf-secondary" @onclick="() => { _showPosForm = false; _posError = null; }">Cancelar</button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- ══ TAB: CONTACTOS ══════════════════════════════════ -->
+    @if (Tab == "contactos")
+    {
+        <div class="hf-section">
+            <div class="hf-section-header">
+                <h2 class="hf-section-title">Contactos personales</h2>
+                @if (!_showContactForm)
+                {
+                    <button class="btn btn-primary btn-sm" @onclick="() => _showContactForm = true">+ Agregar contacto</button>
+                }
+            </div>
+
+            @if (_contacts.Count == 0 && !_showContactForm)
+            {
+                <div class="hf-section-body" style="color:var(--color-foreground-muted);font-size:.875rem">
+                    Sin contactos personales registrados.
+                </div>
+            }
+            else
+            {
+                <div class="hf-contact-grid">
+                    @foreach (var c in _contacts)
+                    {
+                        <div class="hf-contact-card">
+                            <div class="hf-contact-name">@c.FullName</div>
+                            <div class="hf-contact-rel">
+                                @RelationshipLabel(c.Relationship)
+                                @if (c.IsPrimaryEmergencyContact)
+                                {
+                                    <span class="hf-badge hf-badge-danger" style="margin-left:.375rem;font-size:.625rem">Emergencia</span>
+                                }
+                                else if (c.IsEmergencyContact)
+                                {
+                                    <span class="hf-badge hf-badge-warning" style="margin-left:.375rem;font-size:.625rem">Emergencia</span>
+                                }
+                            </div>
+                            @if (!string.IsNullOrEmpty(c.Phone))
+                            {
+                                <div class="hf-contact-detail">
+                                    <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.89a16 16 0 0 0 6.1 6.1l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                    @c.Phone
+                                </div>
+                            }
+                            @if (!string.IsNullOrEmpty(c.Email))
+                            {
+                                <div class="hf-contact-detail">
+                                    <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                    @c.Email
+                                </div>
+                            }
+                            @if (!string.IsNullOrEmpty(c.Notes))
+                            {
+                                <div style="font-size:.8125rem;color:var(--color-foreground-subtle);font-style:italic;margin-top:.125rem">@c.Notes</div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (_showContactForm)
+            {
+                <div class="hf-add-form">
+                    <p class="hf-add-form-title">Agregar contacto personal</p>
+                    <div class="hf-form-grid">
+                        <div>
+                            <label class="hf-field-label form-label">Nombre completo <span style="color:var(--color-destructive)">*</span></label>
+                            <input class="form-control form-control-sm" @bind="_cf.FullName" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Vínculo</label>
+                            <InputSelect TValue="ContactRelationship" @bind-Value="_cf.Relationship" class="form-select form-select-sm">
+                                @foreach (var r in Enum.GetValues<ContactRelationship>())
+                                {
+                                    <option value="@r">@RelationshipLabel(r)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Teléfono</label>
+                            <input class="form-control form-control-sm" @bind="_cf.Phone" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Email</label>
+                            <input class="form-control form-control-sm" type="email" @bind="_cf.Email" />
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:.5rem;justify-content:flex-end">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="chkEmergency" @bind="_cf.IsEmergencyContact" />
+                                <label class="form-check-label" for="chkEmergency" style="font-size:.875rem">Contacto de emergencia</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="chkPrimary" @bind="_cf.IsPrimaryEmergencyContact" />
+                                <label class="form-check-label" for="chkPrimary" style="font-size:.875rem">Principal de emergencia</label>
+                            </div>
+                        </div>
+                        <div class="hf-form-grid-full">
+                            <label class="hf-field-label form-label">Notas</label>
+                            <textarea class="form-control form-control-sm" rows="2" @bind="_cf.Notes"></textarea>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_contactError))
+                        {
+                            <div class="hf-alert-error">@_contactError</div>
+                        }
+                    </div>
+                    <div class="hf-form-actions">
+                        <button class="btn btn-primary btn-sm" @onclick="SaveContact">Guardar contacto</button>
+                        <button class="btn-hf-secondary" @onclick="() => { _showContactForm = false; _contactError = null; }">Cancelar</button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- ══ TAB: DESVINCULACIÓN ══════════════════════════════ -->
+    @if (Tab == "salida")
+    {
+        <div class="hf-section">
+            <div class="hf-section-header">
+                <h2 class="hf-section-title">Desvinculación</h2>
+            </div>
+
+            @if (_termination is not null)
+            {
+                <div class="hf-termination-panel">
+                    <div class="hf-termination-record">
+                        <div class="hf-field-grid" style="padding:0">
+                            <FieldView Label="Fecha de egreso" Value="@_termination.ExitDate.ToString("dd/MM/yyyy")" />
+                            <FieldView Label="Tipo de salida" Value="@ExitTypeLabel(_termination.ExitType)" />
+                            <FieldView Label="Elegible para reingreso" Value="@(_termination.IsEligibleForRehire ? "Sí" : "No")" />
+                            @if (!string.IsNullOrEmpty(_termination.Reason))
+                            {
+                                <div class="hf-field hf-form-grid-full">
+                                    <span class="hf-field-label">Motivo</span>
+                                    <span class="hf-field-value">@_termination.Reason</span>
+                                </div>
+                            }
+                            @if (!string.IsNullOrEmpty(_termination.ExitInterviewNotes))
+                            {
+                                <div class="hf-field hf-form-grid-full">
+                                    <span class="hf-field-label">Entrevista de salida</span>
+                                    <span class="hf-field-value">@_termination.ExitInterviewNotes</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    @if (_employee.Status == EmployeeStatus.Terminated)
+                    {
+                        <div style="margin-top:1rem">
+                            <button class="btn-hf-secondary" @onclick="ArchiveEmployee">
+                                Archivar legajo
+                            </button>
+                            <span style="font-size:.8125rem;color:var(--color-foreground-muted);margin-left:.75rem">
+                                El legajo pasará a estado Archivado y quedará solo lectura.
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
+            else if (_employee.Status == EmployeeStatus.Active || _employee.Status == EmployeeStatus.OnLeave || _employee.Status == EmployeeStatus.Draft)
+            {
+                <div class="hf-termination-panel">
+                    <div class="hf-termination-warning">
+                        Esta acción registrará la salida del empleado y cambiará su estado a <strong>Baja</strong>.
+                        No puede deshacerse desde la interfaz.
+                    </div>
+                    <div class="hf-form-grid">
+                        <div>
+                            <label class="hf-field-label form-label">Fecha de egreso <span style="color:var(--color-destructive)">*</span></label>
+                            <InputDate TValue="DateOnly" @bind-Value="_tf.ExitDate" class="form-control form-control-sm" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Tipo de salida <span style="color:var(--color-destructive)">*</span></label>
+                            <InputSelect TValue="ExitType" @bind-Value="_tf.ExitType" class="form-select form-select-sm">
+                                @foreach (var et in Enum.GetValues<ExitType>())
+                                {
+                                    <option value="@et">@ExitTypeLabel(et)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div style="display:flex;align-items:flex-end">
+                            <div class="form-check" style="margin-bottom:.25rem">
+                                <input class="form-check-input" type="checkbox" id="chkRehire" @bind="_tf.IsEligibleForRehire" />
+                                <label class="form-check-label" for="chkRehire" style="font-size:.875rem">Elegible para reingreso</label>
+                            </div>
+                        </div>
+                        <div class="hf-form-grid-full">
+                            <label class="hf-field-label form-label">Motivo de la desvinculación</label>
+                            <textarea class="form-control form-control-sm" rows="2" @bind="_tf.Reason"></textarea>
+                        </div>
+                        <div class="hf-form-grid-full">
+                            <label class="hf-field-label form-label">Notas de entrevista de salida</label>
+                            <textarea class="form-control form-control-sm" rows="3" @bind="_tf.ExitInterviewNotes"></textarea>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_terminationError))
+                        {
+                            <div class="hf-alert-error">@_terminationError</div>
+                        }
+                    </div>
+                    <div class="hf-form-actions" style="margin-top:1rem">
+                        <button class="btn btn-danger btn-sm" @onclick="SaveTermination">Registrar salida</button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="hf-section-body" style="color:var(--color-foreground-muted);font-size:.875rem">
+                    El legajo está archivado. No se pueden registrar más movimientos.
+                </div>
+            }
+        </div>
+    }
+}
+
+<!-- Subcomponente inline para mostrar campo/valor -->
+@* helper rendered inline *@
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private string Tab { get; set; } = "personal";
+    private bool _loading = true;
+
+    private Employee? _employee;
+    private List<PositionHistory> _positions = [];
+    private List<EmployeeContact> _contacts = [];
+    private TerminationRecord? _termination;
+
+    private List<JobPosition> _jobPositions = [];
+    private List<OrganizationUnit> _orgUnits = [];
+    private List<Employee> _allEmployees = [];
+
+    private string _currentPositionLabel = "";
+    private string _currentUnitLabel = "";
+
+    // ── Edit: personal data ──────────────────────────────
+    private bool _editingPersonal;
+    private string? _personalError;
+    private PersonalEdit _pe = new();
+
+    // ── Form: position move ──────────────────────────────
+    private bool _showPosForm;
+    private string? _posError;
+    private PositionForm _pf = new();
+
+    // ── Form: contact ─────────────────────────────────────
+    private bool _showContactForm;
+    private string? _contactError;
+    private ContactForm _cf = new();
+
+    // ── Form: termination ────────────────────────────────
+    private string? _terminationError;
+    private TerminationForm _tf = new();
+
+    // ─────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync() => await LoadAll();
+
+    private async Task LoadAll()
+    {
+        _loading = true;
+        _employee = await DbContext.Employees.FirstOrDefaultAsync(e => e.Id == Id && !e.IsDeleted);
+
+        if (_employee is not null)
+        {
+            var tid = _employee.TenantId;
+            _positions = await DbContext.PositionHistories
+                .Where(p => p.EmployeeId == Id && !p.IsDeleted)
+                .OrderByDescending(p => p.StartDate)
+                .ToListAsync();
+
+            _contacts = await DbContext.EmployeeContacts
+                .Where(c => c.EmployeeId == Id && !c.IsDeleted)
+                .OrderBy(c => c.IsPrimaryEmergencyContact ? 0 : 1)
+                .ThenBy(c => c.FullName)
+                .ToListAsync();
+
+            _termination = await DbContext.TerminationRecords
+                .FirstOrDefaultAsync(t => t.EmployeeId == Id && !t.IsDeleted);
+
+            _jobPositions = await DbContext.JobPositions
+                .Where(j => j.TenantId == tid && j.IsActive)
+                .OrderBy(j => j.Title)
+                .ToListAsync();
+
+            _orgUnits = await DbContext.OrganizationUnits
+                .Where(u => u.TenantId == tid)
+                .OrderBy(u => u.Name)
+                .ToListAsync();
+
+            _allEmployees = await DbContext.Employees
+                .Where(e => e.TenantId == tid && !e.IsDeleted)
+                .OrderBy(e => e.LastName).ThenBy(e => e.FirstName)
+                .ToListAsync();
+
+            _currentPositionLabel = _employee.JobPositionId.HasValue
+                ? _jobPositions.FirstOrDefault(j => j.Id == _employee.JobPositionId)?.Title ?? ""
+                : "";
+
+            _currentUnitLabel = _employee.OrganizationUnitId.HasValue
+                ? _orgUnits.FirstOrDefault(u => u.Id == _employee.OrganizationUnitId)?.Name ?? ""
+                : "";
+        }
+
+        _loading = false;
+    }
+
+    private void SetTab(string tab)
+    {
+        Tab = tab;
+        _showPosForm = false;
+        _showContactForm = false;
+        _editingPersonal = false;
+        _personalError = _posError = _contactError = _terminationError = null;
+    }
+
+    // ── Personal data edit ────────────────────────────────
+    private void StartEditPersonal()
+    {
+        _pe = new PersonalEdit
+        {
+            NationalId = _employee!.NationalId,
+            TaxId = _employee.TaxId,
+            BirthDate = _employee.BirthDate,
+            MaritalStatus = _employee.MaritalStatus,
+            Nationality = _employee.Nationality,
+            AddressStreet = _employee.AddressStreet,
+            AddressCity = _employee.AddressCity,
+            AddressState = _employee.AddressState,
+            AddressPostalCode = _employee.AddressPostalCode,
+            AddressCountry = _employee.AddressCountry
+        };
+        _editingPersonal = true;
+        _personalError = null;
+    }
+
+    private async Task SavePersonal()
+    {
+        var emp = await DbContext.Employees.FindAsync(_employee!.Id);
+        if (emp is null) return;
+
+        emp.NationalId = _pe.NationalId;
+        emp.TaxId = _pe.TaxId;
+        emp.BirthDate = _pe.BirthDate;
+        emp.MaritalStatus = _pe.MaritalStatus;
+        emp.Nationality = _pe.Nationality;
+        emp.AddressStreet = _pe.AddressStreet;
+        emp.AddressCity = _pe.AddressCity;
+        emp.AddressState = _pe.AddressState;
+        emp.AddressPostalCode = _pe.AddressPostalCode;
+        emp.AddressCountry = _pe.AddressCountry;
+        emp.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await DbContext.SaveChangesAsync();
+        _editingPersonal = false;
+        await LoadAll();
+    }
+
+    // ── Position move ─────────────────────────────────────
+    private async Task SavePosition()
+    {
+        _posError = null;
+        if (_pf.StartDate == default)
+        {
+            _posError = "La fecha de inicio es obligatoria.";
+            return;
+        }
+
+        var currentOpen = _positions.FirstOrDefault(p => p.EndDate is null);
+        if (currentOpen is not null)
+        {
+            var tracked = await DbContext.PositionHistories.FindAsync(currentOpen.Id);
+            if (tracked is not null)
+            {
+                tracked.EndDate = _pf.StartDate.AddDays(-1);
+                tracked.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+        }
+
+        var ph = new PositionHistory
+        {
+            TenantId = _employee!.TenantId,
+            EmployeeId = _employee.Id,
+            JobPositionId = ToGuid(_pf.JobPositionId),
+            OrganizationUnitId = ToGuid(_pf.OrganizationUnitId),
+            ManagerEmployeeId = ToGuid(_pf.ManagerEmployeeId),
+            StartDate = _pf.StartDate,
+            EndDate = null,
+            Reason = _pf.Reason,
+            Notes = _pf.Notes
+        };
+        DbContext.PositionHistories.Add(ph);
+
+        var emp = await DbContext.Employees.FindAsync(_employee.Id);
+        if (emp is not null)
+        {
+            emp.JobPositionId = ph.JobPositionId;
+            emp.OrganizationUnitId = ph.OrganizationUnitId;
+            emp.ManagerEmployeeId = ph.ManagerEmployeeId;
+            emp.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
+        await DbContext.SaveChangesAsync();
+        _showPosForm = false;
+        _pf = new PositionForm();
+        await LoadAll();
+    }
+
+    // ── Contact ───────────────────────────────────────────
+    private async Task SaveContact()
+    {
+        _contactError = null;
+        if (string.IsNullOrWhiteSpace(_cf.FullName))
+        {
+            _contactError = "El nombre del contacto es obligatorio.";
+            return;
+        }
+
+        DbContext.EmployeeContacts.Add(new EmployeeContact
+        {
+            TenantId = _employee!.TenantId,
+            EmployeeId = _employee.Id,
+            FullName = _cf.FullName.Trim(),
+            Relationship = _cf.Relationship,
+            Phone = _cf.Phone,
+            Email = _cf.Email,
+            IsEmergencyContact = _cf.IsEmergencyContact || _cf.IsPrimaryEmergencyContact,
+            IsPrimaryEmergencyContact = _cf.IsPrimaryEmergencyContact,
+            Notes = _cf.Notes
+        });
+
+        await DbContext.SaveChangesAsync();
+        _showContactForm = false;
+        _cf = new ContactForm();
+        await LoadAll();
+    }
+
+    // ── Termination ───────────────────────────────────────
+    private async Task SaveTermination()
+    {
+        _terminationError = null;
+        if (_tf.ExitDate == default)
+        {
+            _terminationError = "La fecha de egreso es obligatoria.";
+            return;
+        }
+
+        DbContext.TerminationRecords.Add(new TerminationRecord
+        {
+            TenantId = _employee!.TenantId,
+            EmployeeId = _employee.Id,
+            ExitDate = _tf.ExitDate,
+            ExitType = _tf.ExitType,
+            Reason = _tf.Reason,
+            ExitInterviewNotes = _tf.ExitInterviewNotes,
+            IsEligibleForRehire = _tf.IsEligibleForRehire
+        });
+
+        var emp = await DbContext.Employees.FindAsync(_employee.Id);
+        if (emp is not null)
+        {
+            emp.Status = EmployeeStatus.Terminated;
+            emp.TerminationDate = _tf.ExitDate;
+            emp.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
+        // Close current position history
+        var currentPos = await DbContext.PositionHistories
+            .FirstOrDefaultAsync(p => p.EmployeeId == _employee.Id && p.EndDate == null);
+        if (currentPos is not null)
+        {
+            currentPos.EndDate = _tf.ExitDate;
+            currentPos.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
+        await DbContext.SaveChangesAsync();
+        await LoadAll();
+    }
+
+    private async Task ArchiveEmployee()
+    {
+        var emp = await DbContext.Employees.FindAsync(_employee!.Id);
+        if (emp is null) return;
+        emp.Status = EmployeeStatus.Archived;
+        emp.UpdatedAt = DateTimeOffset.UtcNow;
+        await DbContext.SaveChangesAsync();
+        await LoadAll();
+    }
+
+    // ── Lookup helpers ────────────────────────────────────
+    private string GetPositionTitle(Guid? id) =>
+        id.HasValue ? _jobPositions.FirstOrDefault(j => j.Id == id)?.Title ?? "—" : "—";
+
+    private string GetUnitName(Guid? id) =>
+        id.HasValue ? _orgUnits.FirstOrDefault(u => u.Id == id)?.Name ?? "—" : "—";
+
+    private string GetEmployeeName(Guid? id) =>
+        id.HasValue ? _allEmployees.FirstOrDefault(e => e.Id == id)?.FullName ?? "—" : "—";
+
+    private static Guid? ToGuid(string? s) =>
+        Guid.TryParse(s, out var g) ? g : null;
+
+    // ── Label helpers ─────────────────────────────────────
+    private static string StatusClass(EmployeeStatus s) => s switch
+    {
+        EmployeeStatus.Active     => "hf-badge hf-badge-success",
+        EmployeeStatus.OnLeave    => "hf-badge hf-badge-warning",
+        EmployeeStatus.Terminated => "hf-badge hf-badge-danger",
+        EmployeeStatus.Archived   => "hf-badge hf-badge-neutral",
+        _                         => "hf-badge hf-badge-neutral"
+    };
+
+    private static string StatusLabel(EmployeeStatus s) => s switch
+    {
+        EmployeeStatus.Active     => "Activo",
+        EmployeeStatus.OnLeave    => "Licencia",
+        EmployeeStatus.Terminated => "Baja",
+        EmployeeStatus.Archived   => "Archivado",
+        EmployeeStatus.Draft      => "Borrador",
+        _                         => s.ToString()
+    };
+
+    private static string MaritalStatusLabel(MaritalStatus? s) => s switch
+    {
+        MaritalStatus.Single              => "Soltero/a",
+        MaritalStatus.Married             => "Casado/a",
+        MaritalStatus.Divorced            => "Divorciado/a",
+        MaritalStatus.Widowed             => "Viudo/a",
+        MaritalStatus.DomesticPartnership => "Unión convivencial",
+        _                                 => "—"
+    };
+
+    private static string ReasonLabel(PositionChangeReason r) => r switch
+    {
+        PositionChangeReason.Hire        => "Ingreso",
+        PositionChangeReason.Promotion   => "Promoción",
+        PositionChangeReason.Transfer    => "Traslado",
+        PositionChangeReason.Demotion    => "Reclasificación",
+        PositionChangeReason.Restructure => "Restructuración",
+        PositionChangeReason.Return      => "Reincorporación",
+        _                                => r.ToString()
+    };
+
+    private static string RelationshipLabel(ContactRelationship r) => r switch
+    {
+        ContactRelationship.Mother  => "Madre",
+        ContactRelationship.Father  => "Padre",
+        ContactRelationship.Spouse  => "Cónyuge",
+        ContactRelationship.Child   => "Hijo/a",
+        ContactRelationship.Sibling => "Hermano/a",
+        ContactRelationship.Partner => "Pareja",
+        ContactRelationship.Friend  => "Amigo/a",
+        _                           => "Otro"
+    };
+
+    private static string ExitTypeLabel(ExitType e) => e switch
+    {
+        ExitType.Voluntary      => "Renuncia voluntaria",
+        ExitType.Involuntary    => "Desvinculación involuntaria",
+        ExitType.Retirement     => "Jubilación",
+        ExitType.MutualAgreement => "Acuerdo mutuo",
+        ExitType.EndOfContract  => "Fin de contrato",
+        ExitType.Abandonment    => "Abandono de puesto",
+        _                       => e.ToString()
+    };
+
+    // ── Inner form models ─────────────────────────────────
+    private sealed class PersonalEdit
+    {
+        public string? NationalId { get; set; }
+        public string? TaxId { get; set; }
+        public DateOnly? BirthDate { get; set; }
+        public MaritalStatus? MaritalStatus { get; set; }
+        public string? Nationality { get; set; }
+        public string? AddressStreet { get; set; }
+        public string? AddressCity { get; set; }
+        public string? AddressState { get; set; }
+        public string? AddressPostalCode { get; set; }
+        public string? AddressCountry { get; set; }
+    }
+
+    private sealed class PositionForm
+    {
+        public string JobPositionId { get; set; } = "";
+        public string OrganizationUnitId { get; set; } = "";
+        public string ManagerEmployeeId { get; set; } = "";
+        public DateOnly StartDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+        public PositionChangeReason Reason { get; set; } = PositionChangeReason.Hire;
+        public string? Notes { get; set; }
+    }
+
+    private sealed class ContactForm
+    {
+        public string FullName { get; set; } = "";
+        public ContactRelationship Relationship { get; set; } = ContactRelationship.Other;
+        public string? Phone { get; set; }
+        public string? Email { get; set; }
+        public bool IsEmergencyContact { get; set; }
+        public bool IsPrimaryEmergencyContact { get; set; }
+        public string? Notes { get; set; }
+    }
+
+    private sealed class TerminationForm
+    {
+        public DateOnly ExitDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+        public ExitType ExitType { get; set; } = ExitType.Voluntary;
+        public string? Reason { get; set; }
+        public string? ExitInterviewNotes { get; set; }
+        public bool IsEligibleForRehire { get; set; } = true;
+    }
+}

@@ -1,0 +1,16 @@
+<div class="hf-field">
+    <span class="hf-field-label">@Label</span>
+    @if (string.IsNullOrEmpty(Value))
+    {
+        <span class="hf-field-value hf-field-empty">—</span>
+    }
+    else
+    {
+        <span class="hf-field-value">@Value</span>
+    }
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string? Value { get; set; }
+}

@@ -4,44 +4,54 @@
 @using Microsoft.EntityFrameworkCore
 @inject ApplicationDbContext DbContext
 
-<PageTitle>Tenants</PageTitle>
+<PageTitle>Tenants — HumanFlow</PageTitle>
 
-<h1>Tenants</h1>
-<p class="text-muted">Catalogo central de clientes y estrategia de almacenamiento para el modelo multi-tenant hibrido.</p>
+<div class="hf-page-header">
+    <div>
+        <h1>Tenants</h1>
+        <p class="hf-page-subtitle">Catálogo central de clientes y estrategia de almacenamiento para el modelo multi-tenant híbrido.</p>
+    </div>
+    <span class="hf-badge hf-badge-primary">@(_tenants?.Count ?? 0) tenants</span>
+</div>
 
 @if (_tenants is null)
 {
-    <p>Cargando...</p>
+    <div class="hf-loading">
+        <div class="hf-loading-spinner"></div>
+        Cargando tenants&hellip;
+    </div>
 }
 else
 {
-    <table class="table table-hover align-middle">
-        <thead>
-            <tr>
-                <th>Nombre</th>
-                <th>Slug</th>
-                <th>Dominio</th>
-                <th>Estado</th>
-                <th>Almacenamiento</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var tenant in _tenants)
-            {
+    <div class="hf-table-wrapper">
+        <table class="hf-table">
+            <thead>
                 <tr>
-                    <td>@tenant.Name</td>
-                    <td><code>@tenant.Slug</code></td>
-                    <td>@tenant.PrimaryDomain</td>
-                    <td>@tenant.Status</td>
-                    <td>
-                        <span class="@StorageClass(tenant.StorageMode)">
-                            @tenant.StorageMode
-                        </span>
-                    </td>
+                    <th>Nombre</th>
+                    <th>Slug</th>
+                    <th>Dominio</th>
+                    <th>Estado</th>
+                    <th>Almacenamiento</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var tenant in _tenants)
+                {
+                    <tr>
+                        <td style="font-weight:600">@tenant.Name</td>
+                        <td><span class="hf-table-code">@tenant.Slug</span></td>
+                        <td style="color:var(--color-foreground-muted)">@tenant.PrimaryDomain</td>
+                        <td>
+                            <span class="@StatusClass(tenant.Status)">@StatusLabel(tenant.Status)</span>
+                        </td>
+                        <td>
+                            <span class="@StorageClass(tenant.StorageMode)">@StorageLabel(tenant.StorageMode)</span>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 @code {
@@ -52,8 +62,31 @@ else
         _tenants = await DbContext.Tenants.OrderBy(x => x.Name).ToListAsync();
     }
 
-    private static string StorageClass(TenantStorageMode storageMode) =>
-        storageMode == TenantStorageMode.DedicatedDatabase
-            ? "badge text-bg-warning"
-            : "badge text-bg-info";
+    private static string StatusClass(TenantStatus status) =>
+        status switch
+        {
+            TenantStatus.Active       => "hf-badge hf-badge-success",
+            TenantStatus.Provisioning => "hf-badge hf-badge-info",
+            TenantStatus.Suspended    => "hf-badge hf-badge-warning",
+            TenantStatus.Archived     => "hf-badge hf-badge-neutral",
+            _                        => "hf-badge hf-badge-neutral"
+        };
+
+    private static string StatusLabel(TenantStatus status) =>
+        status switch
+        {
+            TenantStatus.Active       => "Activo",
+            TenantStatus.Provisioning => "Provisionando",
+            TenantStatus.Suspended    => "Suspendido",
+            TenantStatus.Archived     => "Archivado",
+            _                        => status.ToString()
+        };
+
+    private static string StorageClass(TenantStorageMode mode) =>
+        mode == TenantStorageMode.DedicatedDatabase
+            ? "hf-badge hf-badge-warning"
+            : "hf-badge hf-badge-info";
+
+    private static string StorageLabel(TenantStorageMode mode) =>
+        mode == TenantStorageMode.DedicatedDatabase ? "Dedicada" : "Compartida";
 }
