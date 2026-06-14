@@ -1,6 +1,7 @@
 using HumanFlow.Domain.Contacts;
 using HumanFlow.Domain.Employees;
 using HumanFlow.Domain.Organization;
+using HumanFlow.Domain.Recruitment;
 using HumanFlow.Domain.Security;
 using HumanFlow.Domain.Tenancy;
 using Microsoft.AspNetCore.Identity;
@@ -446,6 +447,175 @@ public static class DemoDataSeeder
                 Status = ReviewStatus.Acknowledged,
                 AcknowledgedDate = new DateOnly(2024, 1, 26)
             });
+        }
+
+        // ── Reclutamiento ────────────────────────────────────────
+        if (!await db.JobRequisitions.AnyAsync(r => r.TenantId == demoTenant.Id))
+        {
+            var req1 = new JobRequisition
+            {
+                TenantId = demoTenant.Id,
+                RequisitionNumber = "REQ-001",
+                Title = "Analista de Recursos Humanos",
+                JobPositionId = posHR?.Id,
+                OrganizationUnitId = unitHR?.Id,
+                RequestedByEmployeeId = emp1?.Id,
+                Status = RequisitionStatus.InProgress,
+                Priority = RequisitionPriority.High,
+                VacanciesCount = 1,
+                OpenDate = new DateOnly(2026, 4, 1),
+                TargetFillDate = new DateOnly(2026, 7, 1),
+                Description = "Buscamos un Analista de RRHH con experiencia en gestión de legajos, reclutamiento y liquidación de sueldos.",
+                Requirements = "Lic. en RRHH o afines. 2+ años de experiencia. Conocimiento de sistemas HRIS.",
+                IsRemote = false
+            };
+
+            var req2 = new JobRequisition
+            {
+                TenantId = demoTenant.Id,
+                RequisitionNumber = "REQ-002",
+                Title = "Desarrollador Full Stack .NET",
+                JobPositionId = posIT?.Id,
+                OrganizationUnitId = unitIT?.Id,
+                RequestedByEmployeeId = emp1?.Id,
+                Status = RequisitionStatus.Open,
+                Priority = RequisitionPriority.Urgent,
+                VacanciesCount = 2,
+                OpenDate = new DateOnly(2026, 5, 15),
+                TargetFillDate = new DateOnly(2026, 8, 15),
+                Description = "Buscamos desarrolladores Full Stack para reforzar el equipo de Tecnología.",
+                Requirements = ".NET / React. 3+ años de experiencia. Experiencia con EF Core y Blazor valorada.",
+                SalaryMin = 2_500_000,
+                SalaryMax = 4_000_000,
+                IsRemote = true
+            };
+
+            db.JobRequisitions.AddRange(req1, req2);
+
+            var cand1 = new Candidate
+            {
+                TenantId = demoTenant.Id,
+                FirstName = "Ana",
+                LastName = "Martínez",
+                Email = "ana.martinez@gmail.com",
+                Phone = "+54 11 6000-1001",
+                Source = CandidateSource.LinkedIn,
+                Notes = "Perfil muy completo. Ex empleada de Grupo Clarín. Disponibilidad inmediata."
+            };
+            var cand2 = new Candidate
+            {
+                TenantId = demoTenant.Id,
+                FirstName = "Carlos",
+                LastName = "Fernández",
+                Email = "carlos.f@outlook.com",
+                Phone = "+54 11 6000-1002",
+                Source = CandidateSource.InternalReferral,
+                ReferredByEmployeeId = emp1?.Id,
+                Notes = "Referido por María Gómez. Conoce los procesos internos."
+            };
+            var cand3 = new Candidate
+            {
+                TenantId = demoTenant.Id,
+                FirstName = "Sofía",
+                LastName = "Torres",
+                Email = "sofia.torres@gmail.com",
+                Phone = "+54 11 6000-1003",
+                Source = CandidateSource.JobBoard,
+                LinkedInUrl = "https://linkedin.com/in/sofiatorres-dev",
+                Notes = "Stack .NET + React. 4 años en fintech."
+            };
+            var cand4 = new Candidate
+            {
+                TenantId = demoTenant.Id,
+                FirstName = "Diego",
+                LastName = "López",
+                Email = "diego.lopez@gmail.com",
+                Phone = "+54 11 6000-1004",
+                Source = CandidateSource.Direct
+            };
+
+            db.Candidates.AddRange(cand1, cand2, cand3, cand4);
+
+            var app1 = new JobApplication
+            {
+                TenantId = demoTenant.Id,
+                CandidateId = cand1.Id,
+                JobRequisitionId = req1.Id,
+                ApplicationDate = new DateOnly(2026, 4, 5),
+                Status = JobApplicationStatus.Interview,
+                Notes = "Candidata destacada. Avanzar a entrevista técnica."
+            };
+            var app2 = new JobApplication
+            {
+                TenantId = demoTenant.Id,
+                CandidateId = cand2.Id,
+                JobRequisitionId = req1.Id,
+                ApplicationDate = new DateOnly(2026, 4, 12),
+                Status = JobApplicationStatus.Screening
+            };
+            var app3 = new JobApplication
+            {
+                TenantId = demoTenant.Id,
+                CandidateId = cand3.Id,
+                JobRequisitionId = req2.Id,
+                ApplicationDate = new DateOnly(2026, 5, 20),
+                Status = JobApplicationStatus.Offer,
+                Notes = "Perfil técnico excepcional. Hacer oferta."
+            };
+            var app4 = new JobApplication
+            {
+                TenantId = demoTenant.Id,
+                CandidateId = cand4.Id,
+                JobRequisitionId = req2.Id,
+                ApplicationDate = new DateOnly(2026, 5, 22),
+                Status = JobApplicationStatus.Interview
+            };
+
+            db.JobApplications.AddRange(app1, app2, app3, app4);
+
+            db.Interviews.AddRange(
+                new Interview
+                {
+                    TenantId = demoTenant.Id,
+                    JobApplicationId = app1.Id,
+                    Type = InterviewType.Phone,
+                    ScheduledDate = new DateOnly(2026, 4, 8),
+                    InterviewerEmployeeId = emp1?.Id,
+                    Status = InterviewStatus.Completed,
+                    Rating = 4,
+                    Feedback = "Buena comunicación. Sólidos conocimientos en HRIS y procesos de RRHH. Recomendada para segunda instancia."
+                },
+                new Interview
+                {
+                    TenantId = demoTenant.Id,
+                    JobApplicationId = app1.Id,
+                    Type = InterviewType.Technical,
+                    ScheduledDate = new DateOnly(2026, 6, 18),
+                    InterviewerEmployeeId = emp1?.Id,
+                    Status = InterviewStatus.Scheduled
+                },
+                new Interview
+                {
+                    TenantId = demoTenant.Id,
+                    JobApplicationId = app3.Id,
+                    Type = InterviewType.Video,
+                    ScheduledDate = new DateOnly(2026, 5, 28),
+                    InterviewerEmployeeId = emp1?.Id,
+                    Status = InterviewStatus.Completed,
+                    Rating = 5,
+                    Feedback = "Perfil excepcional. Dominio de .NET + Blazor. Recomendada para oferta inmediata."
+                },
+                new Interview
+                {
+                    TenantId = demoTenant.Id,
+                    JobApplicationId = app4.Id,
+                    Type = InterviewType.Phone,
+                    ScheduledDate = new DateOnly(2026, 6, 3),
+                    InterviewerEmployeeId = emp1?.Id,
+                    Status = InterviewStatus.Completed,
+                    Rating = 3,
+                    Feedback = "Perfil interesante pero necesita profundizar en arquitectura backend."
+                });
         }
 
         // ── Usuario admin ─────────────────────────────────────────

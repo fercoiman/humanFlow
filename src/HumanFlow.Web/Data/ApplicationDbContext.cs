@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using HumanFlow.Domain.Contacts;
 using HumanFlow.Domain.Employees;
 using HumanFlow.Domain.Organization;
+using HumanFlow.Domain.Recruitment;
 using HumanFlow.Domain.Security;
 using HumanFlow.Domain.Tenancy;
 
@@ -22,6 +23,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<EmployeeContact> EmployeeContacts => Set<EmployeeContact>();
     public DbSet<TerminationRecord> TerminationRecords => Set<TerminationRecord>();
     public DbSet<PerformanceReview> PerformanceReviews => Set<PerformanceReview>();
+    public DbSet<JobRequisition> JobRequisitions => Set<JobRequisition>();
+    public DbSet<Candidate> Candidates => Set<Candidate>();
+    public DbSet<JobApplication> JobApplications => Set<JobApplication>();
+    public DbSet<Interview> Interviews => Set<Interview>();
     public DbSet<Contact> Contacts => Set<Contact>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -111,6 +116,46 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.Property(x => x.GoalsNotes).HasMaxLength(2000);
             entity.Property(x => x.AcknowledgementNotes).HasMaxLength(1000);
             entity.Ignore(x => x.PeriodLabel);
+        });
+
+        builder.Entity<JobRequisition>(entity =>
+        {
+            entity.HasIndex(x => new { x.TenantId, x.RequisitionNumber }).IsUnique();
+            entity.Property(x => x.RequisitionNumber).HasMaxLength(50);
+            entity.Property(x => x.Title).HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(4000);
+            entity.Property(x => x.Requirements).HasMaxLength(4000);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.Property(x => x.SalaryMin).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.SalaryMax).HasColumnType("decimal(18,2)");
+        });
+
+        builder.Entity<Candidate>(entity =>
+        {
+            entity.HasIndex(x => new { x.TenantId, x.Email });
+            entity.Property(x => x.FirstName).HasMaxLength(150);
+            entity.Property(x => x.LastName).HasMaxLength(150);
+            entity.Property(x => x.Email).HasMaxLength(255);
+            entity.Property(x => x.Phone).HasMaxLength(80);
+            entity.Property(x => x.LinkedInUrl).HasMaxLength(500);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.Ignore(x => x.FullName);
+            entity.Ignore(x => x.Initials);
+        });
+
+        builder.Entity<JobApplication>(entity =>
+        {
+            entity.HasIndex(x => new { x.TenantId, x.JobRequisitionId });
+            entity.HasIndex(x => new { x.CandidateId, x.JobRequisitionId }).IsUnique();
+            entity.Property(x => x.RejectionReason).HasMaxLength(500);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+        });
+
+        builder.Entity<Interview>(entity =>
+        {
+            entity.HasIndex(x => new { x.TenantId, x.JobApplicationId });
+            entity.Property(x => x.Feedback).HasMaxLength(2000);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
         });
     }
 }

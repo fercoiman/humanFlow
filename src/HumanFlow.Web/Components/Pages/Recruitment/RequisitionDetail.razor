@@ -1,0 +1,947 @@
+@page "/recruitment/{Id:guid}"
+@rendermode InteractiveServer
+@using HumanFlow.Domain.Employees
+@using HumanFlow.Domain.Organization
+@using HumanFlow.Web.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject NavigationManager Nav
+
+<PageTitle>@(_requisition?.Title ?? "Requisición") — HumanFlow</PageTitle>
+
+@if (_loading)
+{
+    <div class="hf-loading-state">
+        <div class="hf-spinner"></div>
+        <span>Cargando requisición...</span>
+    </div>
+}
+else if (_requisition is null)
+{
+    <div class="hf-section" style="padding:3rem;text-align:center;color:var(--color-foreground-muted)">
+        Requisición no encontrada. <a href="/recruitment">← Volver a Reclutamiento</a>
+    </div>
+}
+else
+{
+    <div style="margin-bottom:1rem">
+        <a href="/recruitment" style="color:var(--color-foreground-muted);font-size:.875rem;text-decoration:none">← Reclutamiento</a>
+    </div>
+
+    <div class="hf-employee-header">
+        <div class="hf-employee-avatar" style="background:var(--color-primary-light);color:var(--color-primary);font-size:1rem">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width:1.375rem;height:1.375rem">
+                <rect x="2" y="7" width="20" height="14" rx="2" />
+                <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+                <line x1="12" y1="12" x2="12" y2="16" />
+                <line x1="10" y1="14" x2="14" y2="14" />
+            </svg>
+        </div>
+        <div class="hf-employee-info">
+            <div class="hf-employee-name">
+                <span class="hf-emp-number">@_requisition.RequisitionNumber</span>
+                @_requisition.Title
+                <span class="@PriorityClass(_requisition.Priority)" style="font-size:.75rem">@PriorityLabel(_requisition.Priority)</span>
+            </div>
+            <div class="hf-employee-meta">
+                <span class="@ReqStatusClass(_requisition.Status)">@ReqStatusLabel(_requisition.Status)</span>
+                @if (_requisition.IsRemote)
+                {
+                    <span class="hf-badge hf-badge-neutral">Remoto</span>
+                }
+                <span style="color:var(--color-foreground-muted)">@_requisition.VacanciesCount vacante@(_requisition.VacanciesCount != 1 ? "s" : "")</span>
+                @if (_requisition.OpenDate.HasValue)
+                {
+                    <span style="color:var(--color-foreground-muted)">Abierta @_requisition.OpenDate.Value.ToString("dd/MM/yyyy")</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="hf-tab-bar">
+        <button class="hf-tab @(Tab == "info" ? "active" : "")" @onclick='() => SetTab("info")'>Información</button>
+        <button class="hf-tab @(Tab == "pipeline" ? "active" : "")" @onclick='() => SetTab("pipeline")'>Pipeline (@_applications.Count)</button>
+    </div>
+
+    @if (Tab == "info")
+    {
+        <div class="hf-section">
+            <div class="hf-section-header">
+                <h2 class="hf-section-title">Datos de la requisición</h2>
+                @if (!_editingInfo)
+                {
+                    <button class="btn-hf-secondary" @onclick="BeginEdit">Editar</button>
+                }
+            </div>
+            <div class="hf-section-body">
+                @if (_editingInfo)
+                {
+                    @if (!string.IsNullOrEmpty(_infoError))
+                    {
+                        <div class="hf-alert-error" style="margin-bottom:1rem">@_infoError</div>
+                    }
+                    <div class="hf-form-grid">
+                        <div class="hf-form-grid-full">
+                            <label class="hf-field-label form-label">Título <span style="color:var(--color-destructive)">*</span></label>
+                            <input class="form-control form-control-sm" @bind="_ef.Title" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Puesto</label>
+                            <select class="form-select form-select-sm" @bind="_ef.JobPositionId">
+                                <option value="">— Sin asignar —</option>
+                                @foreach (var p in _jobPositions)
+                                {
+                                    <option value="@p.Id">@p.Title</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Área</label>
+                            <select class="form-select form-select-sm" @bind="_ef.OrganizationUnitId">
+                                <option value="">— Sin asignar —</option>
+                                @foreach (var u in _orgUnits)
+                                {
+                                    <option value="@u.Id">@u.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Solicitante</label>
+                            <select class="form-select form-select-sm" @bind="_ef.RequestedByEmployeeId">
+                                <option value="">— Sin asignar —</option>
+                                @foreach (var e in _allEmployees)
+                                {
+                                    <option value="@e.Id">@e.FullName</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Prioridad</label>
+                            <InputSelect TValue="RequisitionPriority" @bind-Value="_ef.Priority" class="form-select form-select-sm">
+                                <option value="@RequisitionPriority.Low">Baja</option>
+                                <option value="@RequisitionPriority.Normal">Normal</option>
+                                <option value="@RequisitionPriority.High">Alta</option>
+                                <option value="@RequisitionPriority.Urgent">Urgente</option>
+                            </InputSelect>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Estado</label>
+                            <InputSelect TValue="RequisitionStatus" @bind-Value="_ef.Status" class="form-select form-select-sm">
+                                <option value="@RequisitionStatus.Draft">Borrador</option>
+                                <option value="@RequisitionStatus.Open">Abierta</option>
+                                <option value="@RequisitionStatus.InProgress">En proceso</option>
+                                <option value="@RequisitionStatus.OnHold">En pausa</option>
+                                <option value="@RequisitionStatus.Filled">Cubierta</option>
+                                <option value="@RequisitionStatus.Cancelled">Cancelada</option>
+                            </InputSelect>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Vacantes</label>
+                            <input class="form-control form-control-sm" type="number" min="1" @bind="_ef.VacanciesCount" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Fecha apertura</label>
+                            <InputDate TValue="DateOnly?" @bind-Value="_ef.OpenDate" class="form-control form-control-sm" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Cierre esperado</label>
+                            <InputDate TValue="DateOnly?" @bind-Value="_ef.TargetFillDate" class="form-control form-control-sm" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Salario mín.</label>
+                            <input class="form-control form-control-sm" type="number" step="1000" @bind="_ef.SalaryMin" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Salario máx.</label>
+                            <input class="form-control form-control-sm" type="number" step="1000" @bind="_ef.SalaryMax" />
+                        </div>
+                        <div style="display:flex;align-items:center;gap:.5rem;padding-top:1.25rem">
+                            <input class="form-check-input" type="checkbox" id="efRemote" @bind="_ef.IsRemote" />
+                            <label class="hf-field-label" for="efRemote" style="margin:0">Posición remota</label>
+                        </div>
+                        <div class="hf-form-grid-full">
+                            <label class="hf-field-label form-label">Descripción</label>
+                            <textarea class="form-control form-control-sm" rows="3" @bind="_ef.Description"></textarea>
+                        </div>
+                        <div class="hf-form-grid-full">
+                            <label class="hf-field-label form-label">Requisitos</label>
+                            <textarea class="form-control form-control-sm" rows="3" @bind="_ef.Requirements"></textarea>
+                        </div>
+                        <div class="hf-form-grid-full">
+                            <label class="hf-field-label form-label">Notas internas</label>
+                            <textarea class="form-control form-control-sm" rows="2" @bind="_ef.Notes"></textarea>
+                        </div>
+                    </div>
+                    <div class="hf-form-actions">
+                        <button class="btn btn-primary btn-sm" @onclick="SaveInfo">Guardar cambios</button>
+                        <button class="btn-hf-secondary" @onclick="() => { _editingInfo = false; _infoError = null; }">Cancelar</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="hf-field-grid">
+                        <div class="hf-field">
+                            <span class="hf-field-label">Puesto</span>
+                            <span class="hf-field-value">@GetPositionTitle(_requisition.JobPositionId)</span>
+                        </div>
+                        <div class="hf-field">
+                            <span class="hf-field-label">Área</span>
+                            <span class="hf-field-value">@GetUnitName(_requisition.OrganizationUnitId)</span>
+                        </div>
+                        <div class="hf-field">
+                            <span class="hf-field-label">Solicitante</span>
+                            <span class="hf-field-value">@GetEmployeeName(_requisition.RequestedByEmployeeId)</span>
+                        </div>
+                        <div class="hf-field">
+                            <span class="hf-field-label">Vacantes</span>
+                            <span class="hf-field-value">@_requisition.VacanciesCount</span>
+                        </div>
+                        <div class="hf-field">
+                            <span class="hf-field-label">Apertura</span>
+                            <span class="hf-field-value">@(_requisition.OpenDate?.ToString("dd/MM/yyyy") ?? "—")</span>
+                        </div>
+                        <div class="hf-field">
+                            <span class="hf-field-label">Cierre esperado</span>
+                            <span class="hf-field-value">@(_requisition.TargetFillDate?.ToString("dd/MM/yyyy") ?? "—")</span>
+                        </div>
+                        @if (_requisition.SalaryMin.HasValue || _requisition.SalaryMax.HasValue)
+                        {
+                            <div class="hf-field">
+                                <span class="hf-field-label">Rango salarial</span>
+                                <span class="hf-field-value">
+                                    @(_requisition.SalaryMin.HasValue ? $"${_requisition.SalaryMin.Value:N0}" : "—")
+                                    @if (_requisition.SalaryMax.HasValue)
+                                    {
+                                        <span>– $@_requisition.SalaryMax.Value.ToString("N0")</span>
+                                    }
+                                </span>
+                            </div>
+                        }
+                    </div>
+                    @if (!string.IsNullOrEmpty(_requisition.Description))
+                    {
+                        <div class="hf-field" style="margin-top:1rem">
+                            <span class="hf-field-label">Descripción</span>
+                            <span class="hf-field-value" style="white-space:pre-wrap">@_requisition.Description</span>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(_requisition.Requirements))
+                    {
+                        <div class="hf-field" style="margin-top:.75rem">
+                            <span class="hf-field-label">Requisitos</span>
+                            <span class="hf-field-value" style="white-space:pre-wrap">@_requisition.Requirements</span>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(_requisition.Notes))
+                    {
+                        <div class="hf-field" style="margin-top:.75rem">
+                            <span class="hf-field-label">Notas</span>
+                            <span class="hf-field-value" style="white-space:pre-wrap">@_requisition.Notes</span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+
+    @if (Tab == "pipeline")
+    {
+        <div class="hf-section">
+            <div class="hf-section-header">
+                <h2 class="hf-section-title">Pipeline de candidatos</h2>
+                @if (!_showCandidateForm)
+                {
+                    <button class="btn btn-primary btn-sm" @onclick="() => _showCandidateForm = true">+ Agregar candidato</button>
+                }
+            </div>
+            <div class="hf-section-body">
+                @if (_showCandidateForm)
+                {
+                    <div class="hf-add-form" style="margin-bottom:1.5rem">
+                        <p class="hf-add-form-title">Nuevo candidato</p>
+                        <div class="hf-form-grid">
+                            <div>
+                                <label class="hf-field-label form-label">Nombre <span style="color:var(--color-destructive)">*</span></label>
+                                <input class="form-control form-control-sm" @bind="_cf.FirstName" />
+                            </div>
+                            <div>
+                                <label class="hf-field-label form-label">Apellido <span style="color:var(--color-destructive)">*</span></label>
+                                <input class="form-control form-control-sm" @bind="_cf.LastName" />
+                            </div>
+                            <div>
+                                <label class="hf-field-label form-label">Email</label>
+                                <input class="form-control form-control-sm" type="email" @bind="_cf.Email" />
+                            </div>
+                            <div>
+                                <label class="hf-field-label form-label">Teléfono</label>
+                                <input class="form-control form-control-sm" @bind="_cf.Phone" />
+                            </div>
+                            <div>
+                                <label class="hf-field-label form-label">LinkedIn</label>
+                                <input class="form-control form-control-sm" @bind="_cf.LinkedInUrl" />
+                            </div>
+                            <div>
+                                <label class="hf-field-label form-label">Fuente</label>
+                                <InputSelect TValue="CandidateSource" @bind-Value="_cf.Source" class="form-select form-select-sm">
+                                    <option value="@CandidateSource.Direct">Postulación directa</option>
+                                    <option value="@CandidateSource.LinkedIn">LinkedIn</option>
+                                    <option value="@CandidateSource.InternalReferral">Referido interno</option>
+                                    <option value="@CandidateSource.JobBoard">Portal de empleo</option>
+                                    <option value="@CandidateSource.Agency">Agencia</option>
+                                    <option value="@CandidateSource.Other">Otro</option>
+                                </InputSelect>
+                            </div>
+                            @if (_cf.Source == CandidateSource.InternalReferral)
+                            {
+                                <div>
+                                    <label class="hf-field-label form-label">Referido por</label>
+                                    <select class="form-select form-select-sm" @bind="_cf.ReferredByEmployeeId">
+                                        <option value="">— Sin especificar —</option>
+                                        @foreach (var emp in _allEmployees)
+                                        {
+                                            <option value="@emp.Id">@emp.FullName</option>
+                                        }
+                                    </select>
+                                </div>
+                            }
+                            <div class="hf-form-grid-full">
+                                <label class="hf-field-label form-label">Notas</label>
+                                <textarea class="form-control form-control-sm" rows="2" @bind="_cf.Notes"></textarea>
+                            </div>
+                            @if (!string.IsNullOrEmpty(_cfError))
+                            {
+                                <div class="hf-alert-error hf-form-grid-full">@_cfError</div>
+                            }
+                        </div>
+                        <div class="hf-form-actions">
+                            <button class="btn btn-primary btn-sm" @onclick="SaveCandidate">Agregar al pipeline</button>
+                            <button class="btn-hf-secondary" @onclick="() => { _showCandidateForm = false; _cfError = null; _cf = new(); }">Cancelar</button>
+                        </div>
+                    </div>
+                }
+
+                @if (_applications.Count == 0 && !_showCandidateForm)
+                {
+                    <div style="padding:3rem;text-align:center;color:var(--color-foreground-muted)">
+                        No hay candidatos en este pipeline. Usa "+ Agregar candidato" para comenzar.
+                    </div>
+                }
+
+                @if (_applications.Count > 0)
+                {
+                    <div class="hf-table-wrapper">
+                        <table class="hf-table">
+                            <thead>
+                                <tr>
+                                    <th>Candidato</th>
+                                    <th>Fuente</th>
+                                    <th>Fecha</th>
+                                    <th>Estado</th>
+                                    <th style="text-align:center">Entrevistas</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var app in _applications.OrderBy(a => a.ApplicationDate))
+                                {
+                                    var cand = _candidateMap.GetValueOrDefault(app.CandidateId);
+                                    var ivList = _interviewMap.GetValueOrDefault(app.Id, []);
+                                    var isExp = _expandedAppId == app.Id;
+
+                                    <tr>
+                                        <td>
+                                            <div style="font-weight:600">@(cand?.FullName ?? "—")</div>
+                                            @if (!string.IsNullOrEmpty(cand?.Email))
+                                            {
+                                                <div style="font-size:.8125rem;color:var(--color-foreground-muted)">@cand.Email</div>
+                                            }
+                                        </td>
+                                        <td>
+                                            <span class="hf-badge hf-badge-neutral">@SourceLabel(cand?.Source ?? CandidateSource.Other)</span>
+                                        </td>
+                                        <td style="color:var(--color-foreground-muted)">@app.ApplicationDate.ToString("dd/MM/yyyy")</td>
+                                        <td><span class="@AppStatusClass(app.Status)">@AppStatusLabel(app.Status)</span></td>
+                                        <td style="text-align:center;color:var(--color-foreground-muted)">@ivList.Count</td>
+                                        <td style="text-align:right">
+                                            <button class="btn-hf-secondary" style="padding:.25rem .75rem;font-size:.75rem"
+                                                    @onclick="() => ToggleApp(app.Id)">
+                                                @(isExp ? "Cerrar" : "Ver")
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                    @if (isExp)
+                                    {
+                                        <tr>
+                                            <td colspan="6" style="padding:0">
+                                                <div class="hf-review-detail">
+                                                    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap">
+                                                        <span class="hf-field-label" style="margin:0;white-space:nowrap">Estado</span>
+                                                        <select class="form-select form-select-sm" style="width:auto"
+                                                                @onchange="async e => { if (e.Value != null) await UpdateAppStatus(app.Id, Enum.Parse<JobApplicationStatus>(e.Value.ToString()!)); }">
+                                                            @foreach (var s in Enum.GetValues<JobApplicationStatus>())
+                                                            {
+                                                                <option value="@s" selected="@(s == app.Status)">@AppStatusLabel(s)</option>
+                                                            }
+                                                        </select>
+                                                        @if (!string.IsNullOrEmpty(app.Notes))
+                                                        {
+                                                            <span style="font-size:.8125rem;color:var(--color-foreground-muted);font-style:italic">@app.Notes</span>
+                                                        }
+                                                    </div>
+
+                                                    @if (!string.IsNullOrEmpty(cand?.Phone) || !string.IsNullOrEmpty(cand?.LinkedInUrl))
+                                                    {
+                                                        <div style="margin-bottom:1rem;display:flex;gap:1.5rem;font-size:.875rem">
+                                                            @if (!string.IsNullOrEmpty(cand?.Phone))
+                                                            {
+                                                                <span><span class="hf-field-label" style="margin:0">Tel:</span> @cand.Phone</span>
+                                                            }
+                                                            @if (!string.IsNullOrEmpty(cand?.LinkedInUrl))
+                                                            {
+                                                                <span><span class="hf-field-label" style="margin:0">LinkedIn:</span> @cand.LinkedInUrl</span>
+                                                            }
+                                                        </div>
+                                                    }
+
+                                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+                                                        <span class="hf-field-label" style="margin:0;text-transform:uppercase;letter-spacing:.05em;font-size:.75rem">
+                                                            Entrevistas (@ivList.Count)
+                                                        </span>
+                                                        @if (_interviewFormAppId != app.Id)
+                                                        {
+                                                            <button class="btn-hf-secondary" style="padding:.2rem .625rem;font-size:.75rem"
+                                                                    @onclick="() => OpenInterviewForm(app.Id)">
+                                                                + Registrar
+                                                            </button>
+                                                        }
+                                                    </div>
+
+                                                    @if (ivList.Count > 0)
+                                                    {
+                                                        <table class="hf-table" style="margin-bottom:1rem">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Tipo</th>
+                                                                    <th>Fecha</th>
+                                                                    <th>Entrevistador</th>
+                                                                    <th>Estado</th>
+                                                                    <th>Calif.</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @foreach (var iv in ivList.OrderBy(i => i.ScheduledDate))
+                                                                {
+                                                                    <tr>
+                                                                        <td>
+                                                                            <span class="hf-badge hf-badge-neutral" style="font-size:.7rem">@IntTypeLabel(iv.Type)</span>
+                                                                        </td>
+                                                                        <td style="color:var(--color-foreground-muted)">@(iv.ScheduledDate?.ToString("dd/MM/yyyy") ?? "—")</td>
+                                                                        <td style="color:var(--color-foreground-muted)">@GetEmployeeName(iv.InterviewerEmployeeId)</td>
+                                                                        <td>
+                                                                            <span class="@IntStatusClass(iv.Status)" style="font-size:.75rem">@IntStatusLabel(iv.Status)</span>
+                                                                        </td>
+                                                                        <td>
+                                                                            @if (iv.Rating.HasValue)
+                                                                            {
+                                                                                <span class="hf-badge hf-badge-primary" style="font-size:.7rem">★ @iv.Rating</span>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <span style="color:var(--color-foreground-muted)">—</span>
+                                                                            }
+                                                                        </td>
+                                                                    </tr>
+                                                                    @if (!string.IsNullOrEmpty(iv.Feedback))
+                                                                    {
+                                                                        <tr>
+                                                                            <td colspan="5" style="padding:.25rem 1rem .5rem;font-size:.8125rem;color:var(--color-foreground-muted);font-style:italic;background:var(--color-muted)">
+                                                                                @iv.Feedback
+                                                                            </td>
+                                                                        </tr>
+                                                                    }
+                                                                }
+                                                            </tbody>
+                                                        </table>
+                                                    }
+
+                                                    @if (_interviewFormAppId == app.Id)
+                                                    {
+                                                        <div class="hf-add-form">
+                                                            <p class="hf-add-form-title">Registrar entrevista</p>
+                                                            <div class="hf-form-grid">
+                                                                <div>
+                                                                    <label class="hf-field-label form-label">Tipo</label>
+                                                                    <InputSelect TValue="InterviewType" @bind-Value="_iff.Type" class="form-select form-select-sm">
+                                                                        <option value="@InterviewType.Phone">Telefónica</option>
+                                                                        <option value="@InterviewType.Video">Videoconferencia</option>
+                                                                        <option value="@InterviewType.InPerson">Presencial</option>
+                                                                        <option value="@InterviewType.Technical">Técnica</option>
+                                                                        <option value="@InterviewType.Cultural">Cultural</option>
+                                                                    </InputSelect>
+                                                                </div>
+                                                                <div>
+                                                                    <label class="hf-field-label form-label">Fecha</label>
+                                                                    <InputDate TValue="DateOnly?" @bind-Value="_iff.ScheduledDate" class="form-control form-control-sm" />
+                                                                </div>
+                                                                <div>
+                                                                    <label class="hf-field-label form-label">Entrevistador</label>
+                                                                    <select class="form-select form-select-sm" @bind="_iff.InterviewerEmployeeId">
+                                                                        <option value="">— Sin asignar —</option>
+                                                                        @foreach (var emp in _allEmployees)
+                                                                        {
+                                                                            <option value="@emp.Id">@emp.FullName</option>
+                                                                        }
+                                                                    </select>
+                                                                </div>
+                                                                <div>
+                                                                    <label class="hf-field-label form-label">Estado</label>
+                                                                    <InputSelect TValue="InterviewStatus" @bind-Value="_iff.Status" class="form-select form-select-sm">
+                                                                        <option value="@InterviewStatus.Scheduled">Programada</option>
+                                                                        <option value="@InterviewStatus.Completed">Completada</option>
+                                                                        <option value="@InterviewStatus.Cancelled">Cancelada</option>
+                                                                        <option value="@InterviewStatus.NoShow">No presentó</option>
+                                                                    </InputSelect>
+                                                                </div>
+                                                                @if (_iff.Status == InterviewStatus.Completed)
+                                                                {
+                                                                    <div>
+                                                                        <label class="hf-field-label form-label">Calificación (1–5)</label>
+                                                                        <input class="form-control form-control-sm" type="number" min="1" max="5" @bind="_iff.Rating" />
+                                                                    </div>
+                                                                }
+                                                                <div class="hf-form-grid-full">
+                                                                    <label class="hf-field-label form-label">Feedback / Notas</label>
+                                                                    <textarea class="form-control form-control-sm" rows="2" @bind="_iff.Feedback"></textarea>
+                                                                </div>
+                                                                @if (!string.IsNullOrEmpty(_iffError))
+                                                                {
+                                                                    <div class="hf-alert-error hf-form-grid-full">@_iffError</div>
+                                                                }
+                                                            </div>
+                                                            <div class="hf-form-actions">
+                                                                <button class="btn btn-primary btn-sm" @onclick="() => SaveInterview(app.Id)">Guardar entrevista</button>
+                                                                <button class="btn-hf-secondary" @onclick="() => { _interviewFormAppId = null; _iffError = null; }">Cancelar</button>
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private string Tab { get; set; } = "info";
+    private bool _loading = true;
+
+    private JobRequisition? _requisition;
+    private List<JobApplication> _applications = [];
+    private Dictionary<Guid, Candidate> _candidateMap = [];
+    private Dictionary<Guid, List<Interview>> _interviewMap = [];
+    private List<JobPosition> _jobPositions = [];
+    private List<OrganizationUnit> _orgUnits = [];
+    private List<Employee> _allEmployees = [];
+
+    private bool _editingInfo;
+    private string? _infoError;
+    private ReqEditForm _ef = new();
+
+    private bool _showCandidateForm;
+    private string? _cfError;
+    private CandidateForm _cf = new();
+
+    private Guid? _expandedAppId;
+    private Guid? _interviewFormAppId;
+    private string? _iffError;
+    private InterviewForm _iff = new();
+
+    protected override async Task OnInitializedAsync() => await LoadAll();
+
+    private async Task LoadAll()
+    {
+        _loading = true;
+        _requisition = await DbContext.JobRequisitions
+            .FirstOrDefaultAsync(r => r.Id == Id && !r.IsDeleted);
+
+        if (_requisition is not null)
+        {
+            var tid = _requisition.TenantId;
+
+            _applications = await DbContext.JobApplications
+                .Where(a => a.JobRequisitionId == Id && !a.IsDeleted)
+                .OrderBy(a => a.ApplicationDate)
+                .ToListAsync();
+
+            var candidateIds = _applications.Select(a => a.CandidateId).Distinct().ToList();
+            if (candidateIds.Count > 0)
+            {
+                var candidates = await DbContext.Candidates
+                    .Where(c => candidateIds.Contains(c.Id) && !c.IsDeleted)
+                    .ToListAsync();
+                _candidateMap = candidates.ToDictionary(c => c.Id);
+            }
+
+            var appIds = _applications.Select(a => a.Id).ToList();
+            if (appIds.Count > 0)
+            {
+                var interviews = await DbContext.Interviews
+                    .Where(i => appIds.Contains(i.JobApplicationId) && !i.IsDeleted)
+                    .OrderBy(i => i.ScheduledDate)
+                    .ToListAsync();
+                _interviewMap = interviews
+                    .GroupBy(i => i.JobApplicationId)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+            }
+
+            _jobPositions = await DbContext.JobPositions
+                .Where(j => j.TenantId == tid && j.IsActive)
+                .OrderBy(j => j.Title)
+                .ToListAsync();
+
+            _orgUnits = await DbContext.OrganizationUnits
+                .Where(u => u.TenantId == tid)
+                .OrderBy(u => u.Name)
+                .ToListAsync();
+
+            _allEmployees = await DbContext.Employees
+                .Where(e => e.TenantId == tid && !e.IsDeleted)
+                .OrderBy(e => e.LastName).ThenBy(e => e.FirstName)
+                .ToListAsync();
+        }
+
+        _loading = false;
+    }
+
+    private void SetTab(string tab)
+    {
+        Tab = tab;
+        _editingInfo = false;
+        _infoError = null;
+        _showCandidateForm = false;
+        _cfError = null;
+        _expandedAppId = null;
+        _interviewFormAppId = null;
+        _iffError = null;
+    }
+
+    private void BeginEdit()
+    {
+        _ef = new ReqEditForm
+        {
+            Title = _requisition!.Title,
+            JobPositionId = _requisition.JobPositionId?.ToString() ?? "",
+            OrganizationUnitId = _requisition.OrganizationUnitId?.ToString() ?? "",
+            RequestedByEmployeeId = _requisition.RequestedByEmployeeId?.ToString() ?? "",
+            Status = _requisition.Status,
+            Priority = _requisition.Priority,
+            VacanciesCount = _requisition.VacanciesCount,
+            OpenDate = _requisition.OpenDate,
+            TargetFillDate = _requisition.TargetFillDate,
+            SalaryMin = _requisition.SalaryMin,
+            SalaryMax = _requisition.SalaryMax,
+            IsRemote = _requisition.IsRemote,
+            Description = _requisition.Description,
+            Requirements = _requisition.Requirements,
+            Notes = _requisition.Notes
+        };
+        _editingInfo = true;
+        _infoError = null;
+    }
+
+    private async Task SaveInfo()
+    {
+        _infoError = null;
+        if (string.IsNullOrWhiteSpace(_ef.Title))
+        {
+            _infoError = "El título es obligatorio.";
+            return;
+        }
+
+        var tracked = await DbContext.JobRequisitions.FindAsync(Id);
+        if (tracked is null) return;
+
+        tracked.Title = _ef.Title.Trim();
+        tracked.JobPositionId = ToGuid(_ef.JobPositionId);
+        tracked.OrganizationUnitId = ToGuid(_ef.OrganizationUnitId);
+        tracked.RequestedByEmployeeId = ToGuid(_ef.RequestedByEmployeeId);
+        tracked.Status = _ef.Status;
+        tracked.Priority = _ef.Priority;
+        tracked.VacanciesCount = _ef.VacanciesCount;
+        tracked.OpenDate = _ef.OpenDate;
+        tracked.TargetFillDate = _ef.TargetFillDate;
+        tracked.SalaryMin = _ef.SalaryMin;
+        tracked.SalaryMax = _ef.SalaryMax;
+        tracked.IsRemote = _ef.IsRemote;
+        tracked.Description = _ef.Description;
+        tracked.Requirements = _ef.Requirements;
+        tracked.Notes = _ef.Notes;
+        tracked.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await DbContext.SaveChangesAsync();
+        _editingInfo = false;
+        await LoadAll();
+    }
+
+    private void ToggleApp(Guid id)
+    {
+        if (_expandedAppId == id)
+        {
+            _expandedAppId = null;
+        }
+        else
+        {
+            _expandedAppId = id;
+        }
+        _interviewFormAppId = null;
+        _iffError = null;
+    }
+
+    private async Task UpdateAppStatus(Guid appId, JobApplicationStatus newStatus)
+    {
+        var tracked = await DbContext.JobApplications.FindAsync(appId);
+        if (tracked is null) return;
+        tracked.Status = newStatus;
+        tracked.UpdatedAt = DateTimeOffset.UtcNow;
+        await DbContext.SaveChangesAsync();
+        await LoadAll();
+    }
+
+    private async Task SaveCandidate()
+    {
+        _cfError = null;
+        if (string.IsNullOrWhiteSpace(_cf.FirstName) || string.IsNullOrWhiteSpace(_cf.LastName))
+        {
+            _cfError = "El nombre y apellido son obligatorios.";
+            return;
+        }
+
+        var candidate = new Candidate
+        {
+            TenantId = _requisition!.TenantId,
+            FirstName = _cf.FirstName.Trim(),
+            LastName = _cf.LastName.Trim(),
+            Email = string.IsNullOrWhiteSpace(_cf.Email) ? null : _cf.Email.Trim(),
+            Phone = string.IsNullOrWhiteSpace(_cf.Phone) ? null : _cf.Phone.Trim(),
+            LinkedInUrl = string.IsNullOrWhiteSpace(_cf.LinkedInUrl) ? null : _cf.LinkedInUrl.Trim(),
+            Source = _cf.Source,
+            ReferredByEmployeeId = ToGuid(_cf.ReferredByEmployeeId),
+            Notes = string.IsNullOrWhiteSpace(_cf.Notes) ? null : _cf.Notes.Trim()
+        };
+        DbContext.Candidates.Add(candidate);
+
+        DbContext.JobApplications.Add(new JobApplication
+        {
+            TenantId = _requisition.TenantId,
+            CandidateId = candidate.Id,
+            JobRequisitionId = _requisition.Id,
+            ApplicationDate = DateOnly.FromDateTime(DateTime.Today),
+            Status = JobApplicationStatus.New
+        });
+
+        await DbContext.SaveChangesAsync();
+        _showCandidateForm = false;
+        _cf = new CandidateForm();
+        await LoadAll();
+    }
+
+    private void OpenInterviewForm(Guid appId)
+    {
+        _interviewFormAppId = appId;
+        _iff = new InterviewForm();
+        _iffError = null;
+    }
+
+    private async Task SaveInterview(Guid appId)
+    {
+        _iffError = null;
+
+        DbContext.Interviews.Add(new Interview
+        {
+            TenantId = _requisition!.TenantId,
+            JobApplicationId = appId,
+            Type = _iff.Type,
+            ScheduledDate = _iff.ScheduledDate,
+            InterviewerEmployeeId = ToGuid(_iff.InterviewerEmployeeId),
+            Status = _iff.Status,
+            Rating = _iff.Status == InterviewStatus.Completed ? _iff.Rating : null,
+            Feedback = string.IsNullOrWhiteSpace(_iff.Feedback) ? null : _iff.Feedback.Trim()
+        });
+
+        var app = _applications.FirstOrDefault(a => a.Id == appId);
+        if (app is not null && (app.Status == JobApplicationStatus.New || app.Status == JobApplicationStatus.Screening))
+        {
+            var trackedApp = await DbContext.JobApplications.FindAsync(appId);
+            if (trackedApp is not null)
+            {
+                trackedApp.Status = JobApplicationStatus.Interview;
+                trackedApp.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+        }
+
+        await DbContext.SaveChangesAsync();
+        _interviewFormAppId = null;
+        _iff = new InterviewForm();
+        await LoadAll();
+    }
+
+    private string GetPositionTitle(Guid? id) =>
+        id is null ? "—" : (_jobPositions.FirstOrDefault(p => p.Id == id)?.Title ?? "—");
+
+    private string GetUnitName(Guid? id) =>
+        id is null ? "—" : (_orgUnits.FirstOrDefault(u => u.Id == id)?.Name ?? "—");
+
+    private string GetEmployeeName(Guid? id) =>
+        id is null ? "—" : (_allEmployees.FirstOrDefault(e => e.Id == id)?.FullName ?? "—");
+
+    private static Guid? ToGuid(string? s) =>
+        Guid.TryParse(s, out var g) ? g : null;
+
+    private static string ReqStatusLabel(RequisitionStatus s) => s switch
+    {
+        RequisitionStatus.Draft      => "Borrador",
+        RequisitionStatus.Open       => "Abierta",
+        RequisitionStatus.InProgress => "En proceso",
+        RequisitionStatus.OnHold     => "En pausa",
+        RequisitionStatus.Filled     => "Cubierta",
+        RequisitionStatus.Cancelled  => "Cancelada",
+        _                            => s.ToString()
+    };
+
+    private static string ReqStatusClass(RequisitionStatus s) => s switch
+    {
+        RequisitionStatus.Open       => "hf-badge hf-badge-success",
+        RequisitionStatus.InProgress => "hf-badge hf-badge-primary",
+        RequisitionStatus.OnHold     => "hf-badge hf-badge-warning",
+        RequisitionStatus.Filled     => "hf-badge hf-badge-purple",
+        _                            => "hf-badge hf-badge-neutral"
+    };
+
+    private static string PriorityLabel(RequisitionPriority p) => p switch
+    {
+        RequisitionPriority.Low    => "Baja",
+        RequisitionPriority.Normal => "Normal",
+        RequisitionPriority.High   => "Alta",
+        RequisitionPriority.Urgent => "Urgente",
+        _                          => p.ToString()
+    };
+
+    private static string PriorityClass(RequisitionPriority p) => p switch
+    {
+        RequisitionPriority.Urgent => "hf-badge hf-badge-danger",
+        RequisitionPriority.High   => "hf-badge hf-badge-warning",
+        RequisitionPriority.Normal => "hf-badge hf-badge-primary",
+        _                          => "hf-badge hf-badge-neutral"
+    };
+
+    private static string SourceLabel(CandidateSource s) => s switch
+    {
+        CandidateSource.LinkedIn         => "LinkedIn",
+        CandidateSource.InternalReferral => "Referido interno",
+        CandidateSource.JobBoard         => "Portal de empleo",
+        CandidateSource.Direct           => "Postulación directa",
+        CandidateSource.Agency           => "Agencia",
+        _                                => "Otro"
+    };
+
+    private static string AppStatusLabel(JobApplicationStatus s) => s switch
+    {
+        JobApplicationStatus.New        => "Nuevo",
+        JobApplicationStatus.Screening  => "Screening",
+        JobApplicationStatus.Interview  => "Entrevista",
+        JobApplicationStatus.Assessment => "Evaluación",
+        JobApplicationStatus.Offer      => "Oferta",
+        JobApplicationStatus.Hired      => "Contratado",
+        JobApplicationStatus.Rejected   => "Rechazado",
+        JobApplicationStatus.Withdrawn  => "Retirado",
+        _                               => s.ToString()
+    };
+
+    private static string AppStatusClass(JobApplicationStatus s) => s switch
+    {
+        JobApplicationStatus.Screening  => "hf-badge hf-badge-primary",
+        JobApplicationStatus.Interview  => "hf-badge hf-badge-warning",
+        JobApplicationStatus.Assessment => "hf-badge hf-badge-warning",
+        JobApplicationStatus.Offer      => "hf-badge hf-badge-purple",
+        JobApplicationStatus.Hired      => "hf-badge hf-badge-success",
+        JobApplicationStatus.Rejected   => "hf-badge hf-badge-danger",
+        _                               => "hf-badge hf-badge-neutral"
+    };
+
+    private static string IntTypeLabel(InterviewType t) => t switch
+    {
+        InterviewType.Phone     => "Telefónica",
+        InterviewType.Video     => "Videoconferencia",
+        InterviewType.InPerson  => "Presencial",
+        InterviewType.Technical => "Técnica",
+        InterviewType.Cultural  => "Cultural",
+        _                       => t.ToString()
+    };
+
+    private static string IntStatusLabel(InterviewStatus s) => s switch
+    {
+        InterviewStatus.Scheduled => "Programada",
+        InterviewStatus.Completed => "Completada",
+        InterviewStatus.Cancelled => "Cancelada",
+        InterviewStatus.NoShow    => "No presentó",
+        _                         => s.ToString()
+    };
+
+    private static string IntStatusClass(InterviewStatus s) => s switch
+    {
+        InterviewStatus.Completed => "hf-badge hf-badge-success",
+        InterviewStatus.Cancelled => "hf-badge hf-badge-danger",
+        InterviewStatus.NoShow    => "hf-badge hf-badge-warning",
+        _                         => "hf-badge hf-badge-neutral"
+    };
+
+    private sealed class ReqEditForm
+    {
+        public string Title { get; set; } = "";
+        public string JobPositionId { get; set; } = "";
+        public string OrganizationUnitId { get; set; } = "";
+        public string RequestedByEmployeeId { get; set; } = "";
+        public RequisitionStatus Status { get; set; } = RequisitionStatus.Open;
+        public RequisitionPriority Priority { get; set; } = RequisitionPriority.Normal;
+        public int VacanciesCount { get; set; } = 1;
+        public DateOnly? OpenDate { get; set; }
+        public DateOnly? TargetFillDate { get; set; }
+        public decimal? SalaryMin { get; set; }
+        public decimal? SalaryMax { get; set; }
+        public bool IsRemote { get; set; }
+        public string? Description { get; set; }
+        public string? Requirements { get; set; }
+        public string? Notes { get; set; }
+    }
+
+    private sealed class CandidateForm
+    {
+        public string FirstName { get; set; } = "";
+        public string LastName { get; set; } = "";
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public string? LinkedInUrl { get; set; }
+        public CandidateSource Source { get; set; } = CandidateSource.Direct;
+        public string ReferredByEmployeeId { get; set; } = "";
+        public string? Notes { get; set; }
+    }
+
+    private sealed class InterviewForm
+    {
+        public InterviewType Type { get; set; } = InterviewType.Phone;
+        public DateOnly? ScheduledDate { get; set; }
+        public string InterviewerEmployeeId { get; set; } = "";
+        public InterviewStatus Status { get; set; } = InterviewStatus.Scheduled;
+        public int? Rating { get; set; }
+        public string? Feedback { get; set; }
+    }
+}
