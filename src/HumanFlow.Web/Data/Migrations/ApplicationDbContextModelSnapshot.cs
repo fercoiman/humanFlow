@@ -519,6 +519,70 @@ namespace HumanFlow.Web.Data.Migrations
                     b.ToTable("PositionHistories");
                 });
 
+            modelBuilder.Entity("HumanFlow.Domain.Employees.SalaryHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ChangeReason")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateOnly>("EffectiveDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("ExchangeRateType")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("GrossAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("GrossAmountARS")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("GrossAmountUSD")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsUSD")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("TenantId", "EmployeeId", "EffectiveDate");
+
+                    b.ToTable("SalaryHistories");
+                });
+
             modelBuilder.Entity("HumanFlow.Domain.Employees.TerminationRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1436,6 +1500,15 @@ namespace HumanFlow.Web.Data.Migrations
                     b.HasOne("HumanFlow.Domain.Geography.Locality", null)
                         .WithMany()
                         .HasForeignKey("LocalityId");
+                });
+
+            modelBuilder.Entity("HumanFlow.Domain.Employees.SalaryHistory", b =>
+                {
+                    b.HasOne("HumanFlow.Domain.Employees.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("HumanFlow.Domain.Geography.City", b =>

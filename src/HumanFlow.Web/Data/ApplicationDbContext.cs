@@ -32,6 +32,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Country> Countries => Set<Country>();
     public DbSet<City> Cities => Set<City>();
     public DbSet<Locality> Localities => Set<Locality>();
+    public DbSet<SalaryHistory> SalaryHistories => Set<SalaryHistory>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -118,6 +119,19 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                   .HasForeignKey(x => x.BirthCityId).IsRequired(false);
             entity.HasOne<Locality>().WithMany()
                   .HasForeignKey(x => x.BirthLocalityId).IsRequired(false);
+        });
+
+        builder.Entity<SalaryHistory>(entity =>
+        {
+            entity.HasIndex(x => new { x.TenantId, x.EmployeeId, x.EffectiveDate });
+            entity.Property(x => x.GrossAmount).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.ExchangeRate).HasColumnType("decimal(18,4)");
+            entity.Property(x => x.GrossAmountARS).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.GrossAmountUSD).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasOne<Employee>().WithMany()
+                  .HasForeignKey(x => x.EmployeeId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<PositionHistory>(entity =>

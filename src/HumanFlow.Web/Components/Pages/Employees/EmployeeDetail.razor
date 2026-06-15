@@ -60,6 +60,10 @@ else
             Historial de puestos
             @if (_positions.Count > 0) { <span>&nbsp;(@_positions.Count)</span> }
         </button>
+        <button class="hf-tab @(Tab == "compensaciones" ? "active" : "")" @onclick='() => SetTab("compensaciones")'>
+            Compensaciones
+            @if (_salaries.Count > 0) { <span>&nbsp;(@_salaries.Count)</span> }
+        </button>
         <button class="hf-tab @(Tab == "contactos" ? "active" : "")" @onclick='() => SetTab("contactos")'>
             Contactos
             @if (_contacts.Count > 0) { <span>&nbsp;(@_contacts.Count)</span> }
@@ -159,8 +163,9 @@ else
                         </div>
                         <div>
                             <label class="hf-field-label form-label">Ciudad de nacimiento</label>
-                            <select class="form-select form-select-sm" @bind="_pe.BirthCityId" @bind:after="ResetBirthLocality">
-                                <option value="">— Sin datos —</option>
+                            <select class="form-select form-select-sm" @bind="_pe.BirthCityId" @bind:after="ResetBirthLocality"
+                                    disabled="@(!Guid.TryParse(_pe.BirthCountryId, out _))">
+                                <option value="">— Seleccione ciudad —</option>
                                 @foreach (var c in BirthCitiesFiltered)
                                 {
                                     <option value="@c.Id">@c.Name @(string.IsNullOrEmpty(c.StateName) ? "" : $"({c.StateName})")</option>
@@ -169,8 +174,9 @@ else
                         </div>
                         <div>
                             <label class="hf-field-label form-label">Localidad de nacimiento</label>
-                            <select class="form-select form-select-sm" @bind="_pe.BirthLocalityId">
-                                <option value="">— Sin datos —</option>
+                            <select class="form-select form-select-sm" @bind="_pe.BirthLocalityId"
+                                    disabled="@(!Guid.TryParse(_pe.BirthCityId, out _))">
+                                <option value="">— Seleccione localidad —</option>
                                 @foreach (var l in BirthLocalitiesFiltered)
                                 {
                                     <option value="@l.Id">@l.Name</option>
@@ -195,8 +201,9 @@ else
                         </div>
                         <div>
                             <label class="hf-field-label form-label">Ciudad</label>
-                            <select class="form-select form-select-sm" @bind="_pe.AddressCityId" @bind:after="ResetAddressLocality">
-                                <option value="">— Sin datos —</option>
+                            <select class="form-select form-select-sm" @bind="_pe.AddressCityId" @bind:after="ResetAddressLocality"
+                                    disabled="@(!Guid.TryParse(_pe.AddressCountryId, out _))">
+                                <option value="">— Seleccione ciudad —</option>
                                 @foreach (var c in AddressCitiesFiltered)
                                 {
                                     <option value="@c.Id">@c.Name @(string.IsNullOrEmpty(c.StateName) ? "" : $"({c.StateName})")</option>
@@ -205,8 +212,9 @@ else
                         </div>
                         <div>
                             <label class="hf-field-label form-label">Localidad</label>
-                            <select class="form-select form-select-sm" @bind="_pe.AddressLocalityId">
-                                <option value="">— Sin datos —</option>
+                            <select class="form-select form-select-sm" @bind="_pe.AddressLocalityId"
+                                    disabled="@(!Guid.TryParse(_pe.AddressCityId, out _))">
+                                <option value="">— Seleccione localidad —</option>
                                 @foreach (var l in AddressLocalitiesFiltered)
                                 {
                                     <option value="@l.Id">@l.Name @(string.IsNullOrEmpty(l.PostalCode) ? "" : $"({l.PostalCode})")</option>
@@ -763,6 +771,169 @@ else
     }
 }
 
+    <!-- ══ TAB: COMPENSACIONES ════════════════════════════ -->
+    @if (Tab == "compensaciones")
+    {
+        <div class="hf-section">
+            <div class="hf-section-header">
+                <h2 class="hf-section-title">Compensaciones</h2>
+                @if (!_showSalaryForm)
+                {
+                    <button class="btn btn-primary btn-sm" @onclick="()=>{ _showSalaryForm=true; _sf=new(); _salaryError=null; }">
+                        + Registrar cambio
+                    </button>
+                }
+            </div>
+
+            @* Sueldo actual *@
+            @{ var current = _salaries.OrderByDescending(s => s.EffectiveDate).FirstOrDefault(); }
+            @if (current is not null)
+            {
+                <div class="hf-add-form mb-3" style="background:var(--color-primary-subtle,#eff6ff)">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                        <div>
+                            <div class="text-muted small mb-1">Sueldo actual — desde @current.EffectiveDate.ToString("dd/MM/yyyy")</div>
+                            <div style="font-size:1.35rem;font-weight:700">
+                                @(current.IsUSD ? $"USD {current.GrossAmount:N2}" : $"$ {current.GrossAmountARS:N0}")
+                            </div>
+                            <div class="text-muted small mt-1">
+                                ≈ USD @current.GrossAmountUSD.ToString("N2") &nbsp;·&nbsp;
+                                TC @SalaryRateLabel(current.ExchangeRateType) $@current.ExchangeRate.ToString("N2")
+                            </div>
+                        </div>
+                        <span class="hf-badge hf-badge-primary">@SalaryReasonLabel(current.ChangeReason)</span>
+                    </div>
+                </div>
+            }
+
+            @* Formulario alta *@
+            @if (_showSalaryForm)
+            {
+                <div class="hf-add-form mb-3">
+                    <div class="hf-add-form-title">Registrar cambio salarial</div>
+                    @if (!string.IsNullOrEmpty(_salaryError))
+                    {
+                        <div class="hf-alert-error mb-2">@_salaryError</div>
+                    }
+                    <div class="hf-form-grid">
+                        <div>
+                            <label class="hf-field-label form-label">Fecha de vigencia *</label>
+                            <InputDate TValue="DateOnly" @bind-Value="_sf.EffectiveDate" class="form-control form-control-sm" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Motivo *</label>
+                            <InputSelect TValue="SalaryChangeReason" @bind-Value="_sf.ChangeReason" class="form-select form-select-sm">
+                                @foreach (var r in Enum.GetValues<SalaryChangeReason>())
+                                {
+                                    <option value="@r">@SalaryReasonLabel(r)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Moneda *</label>
+                            <div class="d-flex gap-2 mt-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" id="salARS" name="salCurrency"
+                                           checked="@(!_sf.IsUSD)" @onchange="()=>_sf.IsUSD=false" />
+                                    <label class="form-check-label" for="salARS">ARS</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" id="salUSD" name="salCurrency"
+                                           checked="@(_sf.IsUSD)" @onchange="()=>_sf.IsUSD=true" />
+                                    <label class="form-check-label" for="salUSD">USD</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Importe bruto *</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">@(_sf.IsUSD ? "USD" : "$")</span>
+                                <input class="form-control form-control-sm" type="number" min="0" step="0.01"
+                                       @bind="_sf.GrossAmount" @bind:event="oninput" />
+                            </div>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Tipo de cambio</label>
+                            <InputSelect TValue="ExchangeRateType" @bind-Value="_sf.ExchangeRateType" class="form-select form-select-sm">
+                                @foreach (var t in Enum.GetValues<ExchangeRateType>())
+                                {
+                                    <option value="@t">@SalaryRateLabel(t)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Valor TC (ARS por USD)</label>
+                            <input class="form-control form-control-sm" type="number" min="0" step="0.01"
+                                   @bind="_sf.ExchangeRate" @bind:event="oninput" />
+                        </div>
+                        <div>
+                            <label class="hf-field-label form-label">Equivalente USD (calculado)</label>
+                            <input class="form-control form-control-sm" readonly
+                                   value="@(_sf.ExchangeRate > 0 ? (_sf.IsUSD ? _sf.GrossAmount : _sf.GrossAmount / _sf.ExchangeRate).ToString("N2") : "—")" />
+                        </div>
+                        <div class="hf-form-grid-full">
+                            <label class="hf-field-label form-label">Notas</label>
+                            <textarea class="form-control form-control-sm" rows="2"
+                                      @bind="_sf.Notes" @bind:event="oninput"></textarea>
+                        </div>
+                    </div>
+                    <div class="hf-form-actions">
+                        <button class="btn btn-primary btn-sm" @onclick="SaveSalary">Guardar</button>
+                        <button class="btn-hf-secondary" @onclick="()=>{ _showSalaryForm=false; _salaryError=null; }">Cancelar</button>
+                    </div>
+                </div>
+            }
+
+            @* Historial *@
+            @if (_salaries.Count == 0 && !_showSalaryForm)
+            {
+                <div class="hf-section-body" style="color:var(--color-foreground-muted);font-size:.875rem">
+                    Sin historial de compensaciones registrado.
+                </div>
+            }
+            else if (_salaries.Count > 0)
+            {
+                <div class="hf-table-wrapper">
+                    <table class="hf-table">
+                        <thead>
+                            <tr>
+                                <th>Vigente desde</th>
+                                <th>Importe</th>
+                                <th>Equivalente USD</th>
+                                <th>TC</th>
+                                <th>Motivo</th>
+                                <th>Notas</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var s in _salaries.OrderByDescending(x => x.EffectiveDate))
+                            {
+                                <tr>
+                                    <td><span class="hf-table-code">@s.EffectiveDate.ToString("dd/MM/yyyy")</span></td>
+                                    <td style="font-weight:600">
+                                        @(s.IsUSD ? $"USD {s.GrossAmount:N2}" : $"$ {s.GrossAmountARS:N0}")
+                                    </td>
+                                    <td style="color:var(--color-foreground-muted)">USD @s.GrossAmountUSD.ToString("N2")</td>
+                                    <td style="color:var(--color-foreground-muted)">
+                                        @SalaryRateLabel(s.ExchangeRateType) $@s.ExchangeRate.ToString("N2")
+                                    </td>
+                                    <td><span class="hf-badge hf-badge-neutral">@SalaryReasonLabel(s.ChangeReason)</span></td>
+                                    <td style="color:var(--color-foreground-muted);font-size:.8125rem">@s.Notes</td>
+                                    <td style="text-align:right">
+                                        <button class="btn btn-xs btn-outline-danger"
+                                                @onclick="()=>DeleteSalary(s.Id)">✕</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+}
+
 <!-- Subcomponente inline para mostrar campo/valor -->
 @* helper rendered inline *@
 
@@ -780,9 +951,15 @@ else
     private List<JobPosition> _jobPositions = [];
     private List<OrganizationUnit> _orgUnits = [];
     private List<Employee> _allEmployees = [];
-    private List<Country>  _countries   = [];
-    private List<City>     _cities      = [];
-    private List<Locality> _localities  = [];
+    private List<Country>       _countries  = [];
+    private List<City>          _cities     = [];
+    private List<Locality>      _localities = [];
+    private List<SalaryHistory> _salaries   = [];
+
+    // ── Form: salary ──────────────────────────────────────
+    private bool _showSalaryForm;
+    private string? _salaryError;
+    private SalaryForm _sf = new();
 
     private string _currentPositionLabel = "";
     private string _currentUnitLabel = "";
@@ -859,6 +1036,11 @@ else
                 .OrderBy(e => e.LastName).ThenBy(e => e.FirstName)
                 .ToListAsync();
 
+            _salaries = await DbContext.SalaryHistories
+                .Where(s => s.EmployeeId == Id && !s.IsDeleted)
+                .OrderByDescending(s => s.EffectiveDate)
+                .ToListAsync();
+
             _countries  = await DbContext.Countries
                 .Where(c => c.TenantId == tid && !c.IsDeleted && c.IsActive)
                 .OrderBy(c => c.Name).ToListAsync();
@@ -889,10 +1071,72 @@ else
         _showPosForm = false;
         _showContactForm = false;
         _showReviewForm = false;
+        _showSalaryForm = false;
         _editingPersonal = false;
         _expandedReviewId = null;
-        _personalError = _posError = _contactError = _reviewError = _terminationError = null;
+        _personalError = _posError = _contactError = _reviewError = _terminationError = _salaryError = null;
     }
+
+    // ── Compensaciones ────────────────────────────────────
+    private async Task SaveSalary()
+    {
+        _salaryError = null;
+        if (_sf.EffectiveDate == default)          { _salaryError = "La fecha de vigencia es obligatoria."; return; }
+        if (_sf.GrossAmount <= 0)                  { _salaryError = "El importe debe ser mayor a cero."; return; }
+        if (_sf.ExchangeRate <= 0)                 { _salaryError = "El tipo de cambio debe ser mayor a cero."; return; }
+
+        var amountARS = _sf.IsUSD ? _sf.GrossAmount * _sf.ExchangeRate : _sf.GrossAmount;
+        var amountUSD = _sf.IsUSD ? _sf.GrossAmount : _sf.GrossAmount / _sf.ExchangeRate;
+
+        DbContext.SalaryHistories.Add(new SalaryHistory
+        {
+            TenantId         = _employee!.TenantId,
+            EmployeeId       = _employee.Id,
+            EffectiveDate    = _sf.EffectiveDate,
+            IsUSD            = _sf.IsUSD,
+            GrossAmount      = _sf.GrossAmount,
+            ExchangeRateType = _sf.ExchangeRateType,
+            ExchangeRate     = _sf.ExchangeRate,
+            GrossAmountARS   = Math.Round(amountARS, 2),
+            GrossAmountUSD   = Math.Round(amountUSD, 2),
+            ChangeReason     = _sf.ChangeReason,
+            Notes            = string.IsNullOrWhiteSpace(_sf.Notes) ? null : _sf.Notes.Trim()
+        });
+        await DbContext.SaveChangesAsync();
+        _showSalaryForm = false;
+        _sf = new();
+        await LoadAll();
+    }
+
+    private async Task DeleteSalary(Guid id)
+    {
+        var entity = await DbContext.SalaryHistories.FindAsync(id);
+        if (entity is null) return;
+        entity.IsDeleted = true;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await DbContext.SaveChangesAsync();
+        await LoadAll();
+    }
+
+    private static string SalaryReasonLabel(SalaryChangeReason r) => r switch
+    {
+        SalaryChangeReason.Ingreso      => "Ingreso",
+        SalaryChangeReason.Paritaria    => "Paritaria",
+        SalaryChangeReason.Promocion    => "Promoción",
+        SalaryChangeReason.Revision     => "Revisión",
+        SalaryChangeReason.CambioMoneda => "Cambio de moneda",
+        SalaryChangeReason.Correccion   => "Corrección",
+        _                               => r.ToString()
+    };
+
+    private static string SalaryRateLabel(ExchangeRateType t) => t switch
+    {
+        ExchangeRateType.Oficial => "Oficial",
+        ExchangeRateType.MEP     => "MEP",
+        ExchangeRateType.Blue    => "Blue",
+        ExchangeRateType.Otro    => "Otro",
+        _                        => t.ToString()
+    };
 
     // ── Personal data edit ────────────────────────────────
     private void StartEditPersonal()
@@ -945,17 +1189,25 @@ else
     private void ResetAddressCity()    { _pe.AddressCityId = "";    _pe.AddressLocalityId = ""; }
     private void ResetAddressLocality(){ _pe.AddressLocalityId = ""; }
 
-    private IEnumerable<City> BirthCitiesFiltered => string.IsNullOrEmpty(_pe.BirthCountryId)
-        ? _cities : _cities.Where(c => c.CountryId.ToString() == _pe.BirthCountryId);
+    private IEnumerable<City> BirthCitiesFiltered
+        => Guid.TryParse(_pe.BirthCountryId, out var bcId)
+            ? _cities.Where(c => c.CountryId == bcId)
+            : [];
 
-    private IEnumerable<Locality> BirthLocalitiesFiltered => string.IsNullOrEmpty(_pe.BirthCityId)
-        ? _localities : _localities.Where(l => l.CityId.ToString() == _pe.BirthCityId);
+    private IEnumerable<Locality> BirthLocalitiesFiltered
+        => Guid.TryParse(_pe.BirthCityId, out var bciId)
+            ? _localities.Where(l => l.CityId == bciId)
+            : [];
 
-    private IEnumerable<City> AddressCitiesFiltered => string.IsNullOrEmpty(_pe.AddressCountryId)
-        ? _cities : _cities.Where(c => c.CountryId.ToString() == _pe.AddressCountryId);
+    private IEnumerable<City> AddressCitiesFiltered
+        => Guid.TryParse(_pe.AddressCountryId, out var acId)
+            ? _cities.Where(c => c.CountryId == acId)
+            : [];
 
-    private IEnumerable<Locality> AddressLocalitiesFiltered => string.IsNullOrEmpty(_pe.AddressCityId)
-        ? _localities : _localities.Where(l => l.CityId.ToString() == _pe.AddressCityId);
+    private IEnumerable<Locality> AddressLocalitiesFiltered
+        => Guid.TryParse(_pe.AddressCityId, out var aciId)
+            ? _localities.Where(l => l.CityId == aciId)
+            : [];
 
     private string? GetCountryName(Guid? id)  => id.HasValue ? _countries.FirstOrDefault(c => c.Id == id)?.Name     : null;
     private string? GetCityName(Guid? id)     => id.HasValue ? _cities.FirstOrDefault(c => c.Id == id)?.Name        : null;
@@ -1256,6 +1508,17 @@ else
         public bool IsEmergencyContact { get; set; }
         public bool IsPrimaryEmergencyContact { get; set; }
         public string? Notes { get; set; }
+    }
+
+    private sealed class SalaryForm
+    {
+        public DateOnly          EffectiveDate    { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+        public bool              IsUSD            { get; set; }
+        public decimal           GrossAmount      { get; set; }
+        public ExchangeRateType  ExchangeRateType { get; set; } = ExchangeRateType.Oficial;
+        public decimal           ExchangeRate     { get; set; }
+        public SalaryChangeReason ChangeReason    { get; set; } = SalaryChangeReason.Ingreso;
+        public string?           Notes            { get; set; }
     }
 
     private sealed class TerminationForm
