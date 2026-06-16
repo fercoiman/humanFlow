@@ -37,7 +37,7 @@ public static class StartupInitializer
             dbExists = false;
         }
 
-        // ── 2a. DB existe → solo aplicar migraciones pendientes ────────
+        // ── 2a. DB existe → aplicar migraciones y backfill de datos maestros ──
         if (dbExists)
         {
             var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
@@ -56,6 +56,16 @@ public static class StartupInitializer
                 await db.Database.MigrateAsync();
 
                 logger.LogInformation("HumanFlow: migraciones aplicadas correctamente.");
+            }
+
+            // Backfill: sembrar geografía si las tablas maestras están vacías
+            // (ocurre cuando la DB fue creada antes de que se agregara el seed de geografía)
+            var tenant = await db.Tenants.OrderBy(t => t.CreatedAt).FirstOrDefaultAsync();
+            if (tenant is not null && !await db.Countries.AnyAsync(c => c.TenantId == tenant.Id))
+            {
+                logger.LogInformation("HumanFlow: tablas de geografía vacías — sembrando datos maestros...");
+                await SeedGeographyAsync(db, tenant.Id, logger);
+                logger.LogInformation("HumanFlow: datos geográficos sembrados correctamente.");
             }
 
             return;
@@ -241,25 +251,15 @@ public static class StartupInitializer
         );
 
         // ── Geografía ─────────────────────────────────────────────────
-        logger.LogInformation("HumanFlow: creando datos geográficos de demostración...");
+        await SeedGeographyAsync(db, tenant.Id, logger);
 
-        var gArgentina = new Country { TenantId = tenant.Id, Name = "Argentina", IsoCode = "AR", IsActive = true };
-        var gChile     = new Country { TenantId = tenant.Id, Name = "Chile",     IsoCode = "CL", IsActive = true };
-        var gUruguay   = new Country { TenantId = tenant.Id, Name = "Uruguay",   IsoCode = "UY", IsActive = true };
-        db.Countries.AddRange(gArgentina, gChile, gUruguay);
-        await db.SaveChangesAsync();
-
-        var cBsAs    = new City { TenantId = tenant.Id, CountryId = gArgentina.Id, Name = "Buenos Aires", StateName = "Ciudad Autónoma de Buenos Aires", IsActive = true };
-        var cCordoba = new City { TenantId = tenant.Id, CountryId = gArgentina.Id, Name = "Córdoba",      StateName = "Córdoba",                        IsActive = true };
-        var cRosario = new City { TenantId = tenant.Id, CountryId = gArgentina.Id, Name = "Rosario",      StateName = "Santa Fe",                       IsActive = true };
-        db.Cities.AddRange(cBsAs, cCordoba, cRosario);
-        await db.SaveChangesAsync();
-
-        var lPalermo     = new Locality { TenantId = tenant.Id, CityId = cBsAs.Id,    Name = "Palermo",       PostalCode = "C1425", IsActive = true };
-        var lNvaCordoba  = new Locality { TenantId = tenant.Id, CityId = cCordoba.Id, Name = "Nueva Córdoba", PostalCode = "X5000", IsActive = true };
-        var lPichincha   = new Locality { TenantId = tenant.Id, CityId = cRosario.Id, Name = "Pichincha",     PostalCode = "S2000", IsActive = true };
-        db.Localities.AddRange(lPalermo, lNvaCordoba, lPichincha);
-        await db.SaveChangesAsync();
+        var gArgentina = await db.Countries.FirstAsync(c => c.TenantId == tenant.Id && c.IsoCode == "AR");
+        var cBsAs      = await db.Cities.FirstAsync(c => c.TenantId == tenant.Id && c.Name == "Buenos Aires");
+        var cCordoba   = await db.Cities.FirstAsync(c => c.TenantId == tenant.Id && c.Name == "Córdoba");
+        var cRosario   = await db.Cities.FirstAsync(c => c.TenantId == tenant.Id && c.Name == "Rosario");
+        var lPalermo   = await db.Localities.FirstAsync(l => l.TenantId == tenant.Id && l.Name == "Palermo");
+        var lNvaCordoba= await db.Localities.FirstAsync(l => l.TenantId == tenant.Id && l.Name == "Nueva Córdoba");
+        var lPichincha = await db.Localities.FirstAsync(l => l.TenantId == tenant.Id && l.Name == "Pichincha");
 
         // ── Áreas ─────────────────────────────────────────────────────
         var uHR  = new OrganizationUnit { TenantId = tenant.Id, Name = "Recursos Humanos", Code = "HR"  };
@@ -444,5 +444,29 @@ public static class StartupInitializer
 
         logger.LogInformation(
             "HumanFlow: datos demo creados — 1 tenant, 3 empleados, 3 contactos, 1 requisición, 1 usuario admin.");
+    }
+
+    private static async Task SeedGeographyAsync(ApplicationDbContext db, Guid tenantId, ILogger logger)
+    {
+        var gArgentina = new Country { TenantId = tenantId, Name = "Argentina", IsoCode = "AR", IsActive = true };
+        var gChile     = new Country { TenantId = tenantId, Name = "Chile",     IsoCode = "CL", IsActive = true };
+        var gUruguay   = new Country { TenantId = tenantId, Name = "Uruguay",   IsoCode = "UY", IsActive = true };
+        db.Countries.AddRange(gArgentina, gChile, gUruguay);
+        await db.SaveChangesAsync();
+
+        var cBsAs    = new City { TenantId = tenantId, CountryId = gArgentina.Id, Name = "Buenos Aires", StateName = "Ciudad Autónoma de Buenos Aires", IsActive = true };
+        var cCordoba = new City { TenantId = tenantId, CountryId = gArgentina.Id, Name = "Córdoba",      StateName = "Córdoba",                         IsActive = true };
+        var cRosario = new City { TenantId = tenantId, CountryId = gArgentina.Id, Name = "Rosario",      StateName = "Santa Fe",                        IsActive = true };
+        db.Cities.AddRange(cBsAs, cCordoba, cRosario);
+        await db.SaveChangesAsync();
+
+        db.Localities.AddRange(
+            new Locality { TenantId = tenantId, CityId = cBsAs.Id,    Name = "Palermo",       PostalCode = "C1425", IsActive = true },
+            new Locality { TenantId = tenantId, CityId = cCordoba.Id, Name = "Nueva Córdoba", PostalCode = "X5000", IsActive = true },
+            new Locality { TenantId = tenantId, CityId = cRosario.Id, Name = "Pichincha",     PostalCode = "S2000", IsActive = true }
+        );
+        await db.SaveChangesAsync();
+
+        logger.LogInformation("HumanFlow: geografía sembrada — 3 países, 3 ciudades, 3 localidades.");
     }
 }

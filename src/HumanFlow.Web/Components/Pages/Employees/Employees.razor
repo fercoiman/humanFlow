@@ -1,6 +1,7 @@
 @page "/employees"
 @rendermode InteractiveServer
 @using HumanFlow.Domain.Employees
+@using HumanFlow.Domain.Geography
 @using HumanFlow.Domain.Organization
 @using HumanFlow.Web.Data
 @using Microsoft.EntityFrameworkCore
@@ -168,7 +169,7 @@ else
                             <th>Legajo</th>
                             <th>Nombre</th>
                             <th>Email</th>
-                            <th>Teléfono</th>
+                            <th>Localidad</th>
                             <th>Ingreso</th>
                             <th>Estado</th>
                             <th></th>
@@ -177,6 +178,7 @@ else
                     <tbody>
                         @foreach (var employee in _employees)
                         {
+                            var loc = LocationLabel(employee);
                             <tr>
                                 <td><span class="hf-table-code">@employee.EmployeeNumber</span></td>
                                 <td>
@@ -186,7 +188,16 @@ else
                                     </a>
                                 </td>
                                 <td style="color:var(--color-foreground-muted)">@employee.Email</td>
-                                <td style="color:var(--color-foreground-muted)">@employee.Phone</td>
+                                <td style="color:var(--color-foreground-muted);font-size:.8125rem">
+                                    @if (!string.IsNullOrEmpty(loc))
+                                    {
+                                        <span>@loc</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="opacity:.4">—</span>
+                                    }
+                                </td>
                                 <td style="color:var(--color-foreground-muted)">@employee.HireDate?.ToString("dd/MM/yyyy")</td>
                                 <td><span class="@StatusClass(employee.Status)">@StatusLabel(employee.Status)</span></td>
                                 <td style="text-align:right">
@@ -213,6 +224,8 @@ else
     private List<Employee> _employees = [];
     private List<JobPosition> _jobPositions = [];
     private List<OrganizationUnit> _orgUnits = [];
+    private List<City> _cities = [];
+    private List<Locality> _localities = [];
     private NewEmployeeForm _nf = new();
 
     protected override async Task OnInitializedAsync() => await LoadAll();
@@ -220,7 +233,7 @@ else
     private async Task LoadAll()
     {
         _loading = true;
-        var tid = await DbContext.Tenants.Select(t => t.Id).FirstOrDefaultAsync();
+        var tid = await DbContext.Tenants.OrderBy(t => t.CreatedAt).Select(t => t.Id).FirstOrDefaultAsync();
 
         _employees = await DbContext.Employees
             .Where(e => e.TenantId == tid && !e.IsDeleted)
@@ -236,6 +249,14 @@ else
         _orgUnits = await DbContext.OrganizationUnits
             .Where(u => u.TenantId == tid)
             .OrderBy(u => u.Name)
+            .ToListAsync();
+
+        _cities = await DbContext.Cities
+            .Where(c => c.TenantId == tid && !c.IsDeleted)
+            .ToListAsync();
+
+        _localities = await DbContext.Localities
+            .Where(l => l.TenantId == tid && !l.IsDeleted)
             .ToListAsync();
 
         _loading = false;
@@ -265,7 +286,7 @@ else
         _formError = null;
         if (!Validate()) return;
 
-        var tid = await DbContext.Tenants.Select(t => t.Id).FirstOrDefaultAsync();
+        var tid = await DbContext.Tenants.OrderBy(t => t.CreatedAt).Select(t => t.Id).FirstOrDefaultAsync();
         var totalCount = await DbContext.Employees.CountAsync(e => e.TenantId == tid);
         var empNumber = $"EMP-{totalCount + 1:D4}";
 
@@ -325,6 +346,32 @@ else
 
     private static Guid? ToGuid(string? s) =>
         Guid.TryParse(s, out var g) ? g : null;
+
+    private string LocationLabel(Employee e)
+    {
+        // Prefer FK-resolved master data; fall back to legacy text fields
+        if (e.LocalityId.HasValue)
+        {
+            var loc = _localities.FirstOrDefault(l => l.Id == e.LocalityId);
+            if (loc is not null)
+            {
+                var city = _cities.FirstOrDefault(c => c.Id == loc.CityId);
+                return city is not null && !string.IsNullOrEmpty(city.StateName)
+                    ? $"{loc.Name}, {city.StateName}"
+                    : loc.Name;
+            }
+        }
+        if (e.CityId.HasValue)
+        {
+            var city = _cities.FirstOrDefault(c => c.Id == e.CityId);
+            if (city is not null)
+                return string.IsNullOrEmpty(city.StateName) ? city.Name : $"{city.Name}, {city.StateName}";
+        }
+        // Legacy free-text fallback
+        if (!string.IsNullOrEmpty(e.AddressCity))
+            return string.IsNullOrEmpty(e.AddressState) ? e.AddressCity : $"{e.AddressCity}, {e.AddressState}";
+        return "";
+    }
 
     private static string StatusClass(EmployeeStatus s) => s switch
     {

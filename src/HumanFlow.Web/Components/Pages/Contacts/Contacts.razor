@@ -235,7 +235,7 @@ else
     private async Task LoadAll()
     {
         _loading = true;
-        _tenantId = await DbContext.Tenants.Select(t => t.Id).FirstOrDefaultAsync();
+        _tenantId = await DbContext.Tenants.OrderBy(t => t.CreatedAt).Select(t => t.Id).FirstOrDefaultAsync();
 
         _contacts = await DbContext.Contacts
             .Where(c => c.TenantId == _tenantId && !c.IsDeleted)

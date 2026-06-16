@@ -183,7 +183,7 @@ else
     private async Task LoadAll()
     {
         _loading = true;
-        var tid = await DbContext.Tenants.Select(t => t.Id).FirstOrDefaultAsync();
+        var tid = await DbContext.Tenants.OrderBy(t => t.CreatedAt).Select(t => t.Id).FirstOrDefaultAsync();
 
         _requisitions = await DbContext.JobRequisitions
             .Where(r => r.TenantId == tid && !r.IsDeleted)
@@ -222,7 +222,7 @@ else
             return;
         }
 
-        var tid = await DbContext.Tenants.Select(t => t.Id).FirstOrDefaultAsync();
+        var tid = await DbContext.Tenants.OrderBy(t => t.CreatedAt).Select(t => t.Id).FirstOrDefaultAsync();
         var existingCount = await DbContext.JobRequisitions.CountAsync(r => r.TenantId == tid);
         var reqNumber = $"REQ-{existingCount + 1:D3}";
 

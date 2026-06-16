@@ -665,7 +665,7 @@ else
     // ── Inicialización ────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
-        var tenant = await DbContext.Tenants.FirstOrDefaultAsync();
+        var tenant = await DbContext.Tenants.OrderBy(t => t.CreatedAt).FirstOrDefaultAsync();
         _tenantId = tenant?.Id ?? Guid.Empty;
         await LoadAll();
         _loading = false;
